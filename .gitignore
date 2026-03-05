@@ -1,0 +1,58 @@
+# Python
+*.py[cod]
+*$py.class
+*.so
+__pycache__/
+*.pyc
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Entorno virtual
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+*.bak
+
+# Archivos sensibles del proyecto
+contraseñas
+restaurante_db.sql
+levantar_servicios
+org archivos.txt
+
+# Migraciones (opcional - algunos prefieren incluirlas)
+# */migrations/*.py
+# !*/migrations/__init__.py
