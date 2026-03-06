@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Ingrediente{% endblock %}
+
+{% block content %}
+<style>
+.delete-card{
+    max-width:520px;
+    border:none;
+    border-radius:20px;
+    box-shadow:0 20px 40px -12px rgba(0,0,0,.2);
+}
+.delete-icon{
+    width:90px;
+    height:90px;
+    background:rgba(220,38,38,.1);
+    color:#dc2626;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    font-size:2.5rem;
+    margin:auto;
+}
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card delete-card p-4 text-center">
+                <div class="delete-icon mb-3">
+                    <i class="bi bi-trash"></i>
+                </div>
+
+                <h4 class="fw-bold mb-2">Eliminar ingrediente</h4>
+                <p class="text-muted mb-4">
+                    ¿Seguro que deseas eliminar<br>
+                    <strong class="text-dark">{{ ingrediente.nombre }}</strong>?
+                </p>
+
+                <form method="post" class="d-flex justify-content-center gap-3">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                    <a href="{% url 'inventario:index' %}" class="btn btn-outline-secondary rounded-pill px-4">
+                        Cancelar
+                    </a>
+                </form>
+
+                <small class="text-muted d-block mt-4">
+                    Esta acción no se puede deshacer
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

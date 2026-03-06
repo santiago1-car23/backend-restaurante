@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Factura {{ factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<style>
+    .factura-wrapper {
+        max-width: 800px;
+        margin: 2rem auto;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.15);
+        padding: 2rem 2.5rem;
+    }
+    .factura-header {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .factura-logo {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+    .factura-meta span {
+        display: block;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .table-factura thead th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6c757d;
+        border-top: none;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .table-factura tbody td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    .totales-label {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: #6c757d;
+    }
+    .totales-valor {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    .badge-metodo {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    
+    /* Responsive para móviles */
+    @media (max-width: 768px) {
+        .factura-wrapper {
+            margin: 1rem;
+            padding: 1.5rem 1rem;
+        }
+        .factura-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem;
+        }
+        .factura-meta {
+            text-align: left !important;
+        }
+        .factura-logo {
+            font-size: 1.1rem;
+        }
+        .factura-meta span {
+            font-size: 0.8rem;
+        }
+        .table-factura {
+            font-size: 0.85rem;
+        }
+        .table-factura thead th {
+            font-size: 0.7rem;
+            padding: 0.5rem 0.3rem;
+        }
+        .table-factura tbody td {
+            padding: 0.5rem 0.3rem;
+            font-size: 0.85rem;
+        }
+        .totales-label {
+            font-size: 0.75rem;
+        }
+        .totales-valor {
+            font-size: 0.9rem;
+        }
+        .row.justify-content-end > div {
+            max-width: 100%;
+        }
+    }
+    
+    @media print {
+        body { background: #ffffff; }
+        .navbar, .btn-volver, .btn-imprimir-global { display: none !important; }
+        .factura-wrapper {
+            margin: 0;
+            box-shadow: none;
+            border-radius: 0;
+        }
+    }
+</style>
+
+<div class="factura-wrapper">
+    <div class="d-flex justify-content-between align-items-start factura-header">
+        <div>
+            <div class="factura-logo text-primary mb-1">
+                {{ pedido.restaurante.nombre|default:"RESTAURANTE" }}
+            </div>
+            <div class="small text-muted">
+                Factura de Venta
+            </div>
+        </div>
+        <div class="text-end factura-meta">
+            <span class="fw-bold">Factura {{ factura.numero_factura }}</span>
+            <span>Fecha: {{ factura.fecha|date:"d/m/Y H:i" }}</span>
+            <span>Mesa: {{ pedido.mesa.numero }}</span>
+            <span>Pedido: #{{ pedido.id }}</span>
+            <span>Cajero: {{ factura.cajero.get_full_name|default:factura.cajero.username }}</span>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h6 class="text-uppercase text-muted small mb-1">Cliente</h6>
+            <p class="mb-0 fw-semibold">{{ factura.cliente_nombre|default:"Consumidor Final" }}</p>
+            {% if factura.cliente_nit %}
+                <p class="mb-0 small text-muted">NIT / CC: {{ factura.cliente_nit }}</p>
+            {% endif %}
+        </div>
+        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+            <h6 class="text-uppercase text-muted small mb-1">Método de pago</h6>
+            <span class="badge bg-primary-subtle text-primary border badge-metodo">
+                {{ factura.get_metodo_pago_display }}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive mb-3">
+        <table class="table table-sm table-factura align-middle">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th class="text-center">Cant.</th>
+                    <th class="text-end">V. Unitario</th>
+                    <th class="text-end">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in detalles %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ d.producto.nombre }}</div>
+                        {% if d.observaciones %}
+                        <div class="small text-muted">{{ d.observaciones|linebreaksbr }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ d.cantidad }}</td>
+                    <td class="text-end">${{ d.precio_unitario|pesos }}</td>
+                    <td class="text-end fw-semibold">${{ d.subtotal|pesos }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">Sin productos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row justify-content-end">
+        <div class="col-md-5">
+            <div class="d-flex justify-content-between">
+                <span class="totales-label">Subtotal</span>
+                <span class="totales-valor">${{ factura.subtotal|pesos }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="totales-label">Impuesto</span>
+                <span class="totales-valor">${{ factura.impuesto|pesos }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="totales-label">Descuento</span>
+                <span class="totales-valor">-${{ factura.descuento|pesos }}</span>
+            </div>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="totales-label">Total a pagar</span>
+                <span class="totales-valor h4 mb-0 text-primary">${{ factura.total|pesos }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-between align-items-center">
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm btn-imprimir-global">
+            <i class="bi bi-printer me-1"></i> Imprimir
+        </button>
+        <a href="{% url 'caja:index' %}" class="btn btn-link text-muted btn-volver btn-sm">Volver</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load moneda %}
+
+{% block title %}Caja - Restaurante{% endblock %}
+
+{% block content %}
+<style>
+    /* Mejora de la base y fondos */
+    body { background-color: #f8f9fa; }
+    
+    .card-caja {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        background: #ffffff;
+    }
+    
+    .card-caja:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,.1);
+    }
+
+    /* Estilo de Métricas */
+    .metric-container {
+        border-left: 4px solid transparent;
+        padding-left: 1.25rem;
+    }
+    .metric-primary { border-left-color: #0d6efd; }
+    .metric-success { border-left-color: #198754; }
+    .metric-info { border-left-color: #0dcaf0; }
+    .metric-warning { border-left-color: #ffc107; }
+    .metric-danger { border-left-color: #dc3545; }
+
+    .metric-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        font-weight: 600;
+        color: #6c757d;
+    }
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    /* Botones y Badges */
+    .btn { border-radius: 10px; font-weight: 500; padding: 0.5rem 1.2rem; }
+    .badge-status {
+        padding: 0.6rem 1rem;
+        border-radius: 50rem;
+        font-weight: 500;
+    }
+
+    /* Tablas */
+    .table thead th {
+        background-color: #f8f9fa;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        border-top: none;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.02);
+    }
+
+    /* Scrollbar personalizada para la tabla de ventas recientes */
+    .table-responsive { 
+        max-height: 600px; 
+        overflow-y: auto; 
+        overflow-x: hidden;
+    }
+    
+    .table-responsive::-webkit-scrollbar {
+        width: 10px;
+    }
+    
+    .table-responsive::-webkit-scrollbar-track {
+        background: rgba(0, 147, 175, 0.05);
+        border-radius: 10px;
+        margin: 8px 0;
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #198754 0%, #157347 100%);
+        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 2px 6px rgba(25, 135, 84, 0.3);
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #157347 0%, #0f5132 100%);
+        box-shadow: 0 4px 12px rgba(25, 135, 84, 0.5);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb:active {
+        background: #0f5132;
+    }
+
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row align-items-center mb-4 g-3">
+        <div class="col-md-6">
+            <h2 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-wallet2 text-success"></i> Control de Caja
+            </h2>
+            <p class="text-muted mb-0">Resumen operativo: <strong>{{ hoy|date:"l, d F Y" }}</strong></p>
+            {% if sesion_activa %}
+                <div class="mt-2">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle badge-status">
+                        <i class="bi bi-person-check-fill me-1"></i> Abierta por {{ sesion_activa.usuario_apertura.username }} 
+                        <span class="mx-1">•</span> 
+                        <i class="bi bi-clock me-1"></i> {{ sesion_activa.fecha_apertura|date:"H:i" }}
+                    </span>
+                </div>
+            {% else %}
+                <div class="mt-2">
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle badge-status">
+                        <i class="bi bi-exclamation-octagon-fill me-1"></i> Caja cerrada actualmente
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col-md-6 d-flex justify-content-md-end gap-2">
+            <a href="{% url 'caja:historial_caja' %}" class="btn btn-white border shadow-sm text-dark">
+                <i class="bi bi-journal-text me-1"></i> Historial
+            </a>
+            {% if not sesion_activa %}
+                <a href="{% url 'caja:abrir_caja' %}" class="btn btn-success shadow-sm px-4">
+                    <i class="bi bi-unlock-fill me-1"></i> Abrir caja
+                </a>
+            {% else %}
+                <a href="{% url 'caja:cerrar_caja' %}" class="btn btn-danger shadow-sm px-4">
+                    <i class="bi bi-lock-fill me-1"></i> Cerrar caja
+                </a>
+            {% endif %}
+            <a href="{% url 'dashboard' %}" class="btn btn-dark shadow-sm">
+                <i class="bi bi-house-door"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-primary">
+                <div class="metric-label">Total Recaudado</div>
+                <div class="metric-value text-primary">${{ total_dia|pesos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-success">
+                <div class="metric-label">Efectivo</div>
+                <div class="metric-value text-success">${{ total_efectivo|pesos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-info">
+                <div class="metric-label">Tarjeta</div>
+                <div class="metric-value text-info">${{ total_tarjeta|pesos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-warning">
+                <div class="metric-label">Nequi</div>
+                <div class="metric-value text-warning">${{ total_nequi|pesos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container">
+                <div class="metric-label">Facturas / Prom.</div>
+                <div class="metric-value">
+                    {{ total_facturas }} 
+                    <span class="fs-6 fw-normal text-muted">(${{ valor_promedio|pesos }})</span>
+                </div>
+            </div>
+        </div>
+        {% if sesion_activa %}
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-danger">
+                <div class="metric-label">Egresos</div>
+                <div class="metric-value text-danger">${{ sesion_activa.salidas|default:"0"|pesos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card card-caja p-3 metric-container metric-success">
+                <div class="metric-label">Entradas extra</div>
+                <div class="metric-value text-success">${{ sesion_activa.entradas_extra|default:"0"|pesos }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card card-caja h-100 overflow-hidden">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                        <i class="bi bi-receipt text-primary"></i> Ventas Recientes
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if facturas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Folio</th>
+                                    <th>Hora</th>
+                                    <th>Referencia</th>
+                                    <th>Método Pago</th>
+                                    <th class="text-end pe-4">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in facturas %}
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-muted">#{{ f.numero_factura }}</td>
+                                    <td>{{ f.fecha|time:"H:i" }}</td>
+                                    <td>
+                                        <span class="d-block small fw-bold">Pedido #{{ f.pedido.id }}</span>
+                                        <span class="text-muted small">Mesa {{ f.pedido.mesa.numero }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            {{ f.get_metodo_pago_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-4 fw-bold text-dark">
+                                        ${{ f.total|pesos }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="p-5 text-center">
+                        <i class="bi bi-inbox text-muted fs-1 d-block mb-3"></i>
+                        <p class="text-muted">No se han registrado ventas el día de hoy.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            {% if sesion_activa %}
+            <div class="card card-caja p-4 mb-4 border-top border-primary border-4">
+                <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary">
+                    <i class="bi bi-table"></i> Mesas ocupadas para cobrar
+                </h6>
+                {% if pedidos_para_cobrar %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Mesa</th>
+                                    <th>Pedido</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in pedidos_para_cobrar %}
+                                <tr>
+                                    <td>
+                                        {% if p.mesa.numero == 0 %}
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-lightning-fill me-1"></i>VENTA RÁPIDA</span>
+                                        {% else %}
+                                            Mesa {{ p.mesa.numero }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="fw-semibold">#{{ p.id }}</span><br>
+                                        <span class="small text-muted">{{ p.mesero.get_full_name|default:p.mesero.username }}</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-dark">${{ p.total|pesos }}</td>
+                                    <td class="text-end">
+                                        <a href="{% url 'caja:cobrar_pedido' p.id %}" class="btn btn-sm btn-success" title="Cobrar pedido">
+                                            <i class="bi bi-cash-stack"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted small mb-0">No hay mesas pendientes de pago.</p>
+                {% endif %}
+            </div>
+
+            <div class="card card-caja p-4 mb-4 border-top border-danger border-4">
+                <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-danger">
+                    <i class="bi bi-dash-circle-fill"></i> Registrar Salida de Dinero
+                </h6>
+                <form method="post" action="{% url 'caja:registrar_salida' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Monto</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light fw-bold border-end-0">$</span>
+                            <input type="number" name="valor" step="0.01" min="0" class="form-control border-start-0" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Concepto / Motivo</label>
+                        <textarea name="descripcion" class="form-control" rows="2" placeholder="Ej: Pago a proveedor de verduras"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100 shadow-sm">
+                        Confirmar Egreso
+                    </button>
+                </form>
+            </div>
+            <div class="card card-caja p-4 mb-4 border-top border-success border-4">
+                <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-success">
+                    <i class="bi bi-plus-circle-fill"></i> Registrar Entrada Adicional
+                </h6>
+                <form method="post" action="{% url 'caja:registrar_entrada' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Monto</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light fw-bold border-end-0">$</span>
+                            <input type="number" name="valor" step="0.01" min="0" class="form-control border-start-0" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Concepto / Origen</label>
+                        <textarea name="descripcion" class="form-control" rows="2" placeholder="Ej: Venta independiente, recarga, etc."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 shadow-sm">
+                        Confirmar Entrada
+                    </button>
+                </form>
+                    <hr class="my-3">
+                    <div class="d-grid d-md-flex justify-content-md-between align-items-center gap-2">
+                        <div class="text-muted small">
+                            Para ventas de productos sin mesa física utiliza la venta rápida.
+                        </div>
+                        <a href="{% url 'caja:venta_rapida' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-lightning-charge"></i> Venta rápida sin mesa
+                        </a>
+                    </div>
+            </div>
+            {% endif %}
+
+            <div class="card card-caja p-4">
+                <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up-arrow text-primary"></i> Lo más vendido hoy
+                </h6>
+                {% if top_productos %}
+                    <div class="list-group list-group-flush">
+                        {% for p in top_productos %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent border-bottom-dashed">
+                            <div class="me-auto">
+                                <div class="fw-bold text-dark">{{ p.producto__nombre }}</div>
+                                <div class="badge bg-primary-subtle text-primary">{{ p.cantidad }} unidades</div>
+                            </div>
+                            <div class="text-end">
+                                <span class="fw-bold d-block">${{ p.total|pesos }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <p class="text-muted small mb-0">Esperando primeras ventas...</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+

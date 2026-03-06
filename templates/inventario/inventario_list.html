@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load moneda %}
+
+{% block title %}Inventario - Restaurante{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --inv-bg: #f9fafb;
+        --inv-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        --inv-radius: 12px;
+    }
+
+    .inv-card {
+        border: none;
+        border-radius: var(--inv-radius);
+        box-shadow: var(--inv-card-shadow);
+        background: rgba(255, 255, 255, 0.85); /* Un poco más transparente para ver el fondo intenso */
+        backdrop-filter: blur(8px);
+    }
+
+    .stat-card {
+        transition: transform 0.2s;
+        border: none;
+        border-radius: var(--inv-radius);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(8px);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .badge-critico {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fee2e2;
+        font-weight: 600;
+        padding: 0.5em 0.8em;
+    }
+
+    .badge-ok {
+        background: #f0fdf4;
+        color: #16a34a;
+        border: 1px solid #dcfce7;
+        font-weight: 600;
+        padding: 0.5em 0.8em;
+    }
+
+    .table thead th {
+        background-color: rgba(248, 250, 252, 0.8);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        color: #64748b;
+        padding: 16px;
+    }
+
+    .table tbody td {
+        padding: 16px;
+        color: #334155;
+    }
+
+    .search-input {
+        border-radius: 8px 0 0 8px;
+    }
+
+    .btn-filter {
+        border-radius: 0 8px 8px 0;
+    }
+
+    .stock-number {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-weight: 600;
+    }
+
+    .btn-primary {
+        background-color: #0093af;
+        border-color: #0093af;
+    }
+
+    .btn-primary:hover,
+    .btn-primary:focus {
+        background-color: #007f96;
+        border-color: #007f96;
+    }
+
+    /* Ajustes para pantallas pequeñas (celular) */
+    @media (max-width: 576px) {
+        .inv-card,
+        .stat-card {
+            background: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .table thead th,
+        .table tbody td {
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+
+        .input-group .form-control {
+            min-width: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 pb-5">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="bi bi-box-seam text-primary me-2"></i>Gestión de Inventario
+            </h2>
+            <p class="text-muted mb-0">Monitoreo de existencias e insumos en tiempo real.</p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <form method="get" action="" class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 w-100 w-sm-auto">
+                <div class="input-group shadow-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0 search-input" placeholder="Buscar..." value="{{ query }}">
+                    <button type="submit" class="btn btn-primary px-3 btn-filter">Filtrar</button>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="criticos" name="criticos" value="1" {% if solo_bajo_stock %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label small fw-medium" for="criticos">Críticos</label>
+                </div>
+            </form>
+
+            {% if puede_gestionar_inventario %}
+            <a href="{% url 'inventario:movimientos' %}" class="btn btn-white border shadow-sm px-3 rounded-3 bg-white">
+                <i class="bi bi-clock-history me-1"></i> Movimientos
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="p-2 bg-primary-subtle rounded-3 me-3">
+                            <i class="bi bi-tag text-primary"></i>
+                        </div>
+                        <span class="text-muted small fw-medium">Total Items</span>
+                    </div>
+                    <h3 class="fw-bold mb-0">{{ total_ingredientes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card shadow-sm h-100 border-start border-danger border-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="p-2 bg-danger-subtle rounded-3 me-3">
+                            <i class="bi bi-exclamation-triangle text-danger"></i>
+                        </div>
+                        <span class="text-muted small fw-medium">Bajo Stock</span>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-danger">{{ ingredientes_criticos }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Table Card -->
+    <div class="card inv-card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Ingrediente</th>
+                            <th class="text-center">Unidad</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Mínimo</th>
+                            <th class="text-end">Costo U.</th>
+                            <th class="text-center">Estado</th>
+                            {% if request.user.is_staff %}<th class="text-end pe-4">Acciones</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ing in ingredientes %}
+                        <tr>
+                            <td class="ps-4">
+                                <span class="fw-bold text-dark">{{ ing.nombre }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark border fw-normal">{{ ing.get_unidad_display }}</span>
+                            </td>
+                            <td class="text-end stock-number">
+                                <span class="{% if ing.alerta_stock %}text-danger fw-bold{% endif %}">
+                                    {{ ing.cantidad_actual }}
+                                </span>
+                            </td>
+                            <td class="text-end text-muted stock-number">{{ ing.cantidad_minima }}</td>
+                            <td class="text-end stock-number">${{ ing.costo_unitario|pesos }}</td>
+                            <td class="text-center">
+                                {% if ing.alerta_stock %}
+                                    <span class="badge badge-critico rounded-pill">
+                                        <i class="bi bi-arrow-down-circle me-1"></i> Crítico
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-ok rounded-pill">
+                                        <i class="bi bi-check-circle me-1"></i> Óptimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            {% if puede_gestionar_inventario %}
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="{% url 'inventario:ingrediente_editar' ing.id %}" class="btn btn-sm btn-light border" title="Editar">
+                                        <i class="bi bi-pencil-square text-primary"></i>
+                                    </a>
+                                    <a href="{% url 'inventario:ingrediente_eliminar' ing.id %}" class="btn btn-sm btn-light border" title="Eliminar">
+                                        <i class="bi bi-trash text-danger"></i>
+                                    </a>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="bi bi-search text-muted display-6"></i>
+                                <p class="text-muted mt-3 mb-0">No se encontraron ingredientes registrados.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}
+

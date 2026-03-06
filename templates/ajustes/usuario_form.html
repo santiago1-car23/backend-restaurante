@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if modo == 'editar' %}Editar Usuario{% else %}Nuevo Usuario{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-7">
+            <div class="mb-3">
+                <a href="{% url 'ajustes:usuarios_list' %}" class="text-decoration-none text-muted small fw-bold">
+                    <i class="bi bi-chevron-left me-1"></i> VOLVER A USUARIOS
+                </a>
+            </div>
+
+            <div class="card card-custom border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-primary-subtle text-primary p-3 rounded-4 me-3">
+                            <i class="bi bi-people fs-4"></i>
+                        </div>
+                        <div>
+                            <h1 class="h4 fw-bold mb-0">{% if modo == 'editar' %}Editar Usuario{% else %}Nuevo Usuario{% endif %}</h1>
+                            <p class="text-muted small mb-0">Configura los datos de acceso y el rol del empleado.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+
+                    {% if user_form.errors or empleado_form.errors %}
+                        <div class="alert alert-danger small mb-4">
+                            <strong>Revisa los datos ingresados.</strong> Algunos campos tienen errores:
+                            <ul class="mb-0 mt-2">
+                                {% for field in user_form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% if user_form.non_field_errors %}
+                                    {% for error in user_form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                {% endif %}
+
+                                {% for field in empleado_form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% if empleado_form.non_field_errors %}
+                                    {% for error in empleado_form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                {% endif %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <h6 class="text-uppercase text-muted fw-bold small mb-3">Datos de acceso</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Usuario</label>
+                                {{ user_form.username }}
+                                {% if user_form.username.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.username.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Rol</label>
+                                {{ user_form.rol }}
+                                {% if user_form.rol.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.rol.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Nombre</label>
+                                {{ user_form.first_name }}
+                                {% if user_form.first_name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.first_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Apellido</label>
+                                {{ user_form.last_name }}
+                                {% if user_form.last_name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.last_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Correo</label>
+                                {{ user_form.email }}
+                                {% if user_form.email.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center mt-4 pt-2">
+                                <div class="form-check form-switch">
+                                    {{ user_form.is_active }}
+                                    <label class="form-check-label small ms-2">Usuario activo</label>
+                                </div>
+                                {% if user_form.is_active.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.is_active.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <h6 class="text-uppercase text-muted fw-bold small mb-3">Contraseña</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Contraseña</label>
+                                {{ user_form.password1 }}
+                                {% if user_form.password1.help_text %}
+                                    <div class="form-text small">{{ user_form.password1.help_text }}</div>
+                                {% endif %}
+                                {% if user_form.password1.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.password1.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Confirmar contraseña</label>
+                                {{ user_form.password2 }}
+                                {% if user_form.password2.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in user_form.password2.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <h6 class="text-uppercase text-muted fw-bold small mb-3">Datos del empleado</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Teléfono</label>
+                                {{ empleado_form.telefono }}
+                                {% if empleado_form.telefono.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in empleado_form.telefono.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Dirección</label>
+                                {{ empleado_form.direccion }}
+                                {% if empleado_form.direccion.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in empleado_form.direccion.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Hora de entrada</label>
+                                {{ empleado_form.hora_entrada }}
+                                {% if empleado_form.hora_entrada.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in empleado_form.hora_entrada.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Hora de salida</label>
+                                {{ empleado_form.hora_salida }}
+                                {% if empleado_form.hora_salida.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in empleado_form.hora_salida.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-12 d-flex align-items-center mt-2">
+                                <div class="form-check">
+                                    {{ empleado_form.activo }}
+                                    <label class="form-check-label small ms-2">Empleado activo</label>
+                                </div>
+                                {% if empleado_form.activo.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in empleado_form.activo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {% if user_form.non_field_errors %}
+                            <div class="alert alert-danger small">
+                                {{ user_form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex flex-column flex-md-row justify-content-end gap-3 pt-4 border-top">
+                            <a href="{% url 'ajustes:usuarios_list' %}" class="btn btn-light">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary px-5">
+                                <i class="bi bi-cloud-check me-2"></i>Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

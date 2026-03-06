@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+    --primary: #0093af;
+    --success: #2ecc71;
+    --warning: #edcd02;
+    --dark: #2d3436;
+    --light-bg: #f8f9fa;
+    --shadow: 0 10px 30px -5px rgba(0,0,0,0.1);
+}
+
+body { background-color: var(--light-bg); }
+
+/* Header Refinado */
+.pedido-header {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    box-shadow: var(--shadow);
+    border-left: 5px solid var(--primary);
+}
+
+/* Cards con mejores bordes */
+.card-soft {
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* Tabla Estilizada */
+.table thead th {
+    background-color: #fafbfc;
+    text-transform: uppercase;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #8898aa;
+    padding: 1rem;
+    border-bottom: 1px solid #edf2f9;
+}
+
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #edf2f9;
+}
+
+/* Badges y Botones */
+.total-badge {
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50px;
+    letter-spacing: -0.2px;
+}
+
+.status-badge {
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.category-filters .btn {
+    border-radius: 50px;
+    font-weight: 600;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.category-filters .btn-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.category-filters .btn-outline-primary {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.category-filters .btn-primary:hover,
+.category-filters .btn-outline-primary:hover {
+    background-color: #007f96;
+    border-color: #007f96;
+    color: #ffffff;
+}
+
+/* Formulario */
+.form-label {
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+    color: #495057;
+}
+
+.form-control, .form-select {
+    border: 1px solid #e1e5eb;
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 147, 175, 0.1);
+}
+
+.rounded-4 { border-radius: 12px !important; }
+</style>
+
+{% if messages %}
+<div class="container mt-3">
+    {% for message in messages %}
+        <div class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag }}{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container py-5">
+
+    <!-- HEADER -->
+    <div class="pedido-header mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="fw-bold mb-0">
+                    Pedido #{{ pedido.id }} <span class="text-muted fw-light mx-2">·</span> Mesa {{ pedido.mesa.numero }}
+                </h2>
+                <div class="text-muted small mt-1">
+                    <i class="bi bi-person-badge me-1"></i>
+                    Mesero: <span class="fw-semibold text-dark">{{ pedido.mesero.get_full_name|default:pedido.mesero.username }}</span>
+                </div>
+            </div>
+            <div class="d-flex flex-column align-items-end">
+                {% if pedido.factura %}
+                    <a href="{% url 'caja:factura_detalle' pedido.factura.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-receipt-cutoff me-1"></i> Ver factura
+                    </a>
+                {% endif %}
+            </div>
+
+            <span class="badge status-badge px-4 py-2 shadow-sm
+                {% if pedido.estado == 'pendiente' %}bg-warning text-dark
+                {% elif pedido.estado == 'en_preparacion' %}bg-warning text-dark
+                {% elif pedido.estado == 'listo' %}bg-primary text-white
+                {% elif pedido.estado == 'entregado' and pedido.factura %}bg-success text-white
+                {% elif pedido.estado == 'entregado' %}bg-primary text-white
+                {% elif pedido.estado == 'cancelado' %}bg-secondary text-white
+                {% endif %}">
+                {% if pedido.estado == 'entregado' and pedido.factura %}
+                    Pagado
+                {% else %}
+                    {{ pedido.get_estado_display }}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    {% with rol_nombre=user.empleado.rol.nombre|default:'' %}
+    <div class="row g-4">
+
+        <!-- PRODUCTOS DEL PEDIDO -->
+        <div class="{% if rol_nombre == 'cocinero' %}col-12{% else %}col-lg-8{% endif %}">
+            <div class="card card-soft h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0">
+                        <i class="bi bi-receipt text-primary me-2"></i>Productos del pedido
+                    </h5>
+                    <span class="badge bg-dark total-badge shadow-sm" id="pedidoTotalLabel">
+                        $ {{ pedido.total|pesos }}
+                    </span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Cant.</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-end">Precio</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detalleTbody">
+                        {% include 'pedidos/_detalle_tbody.html' %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- AGREGAR PRODUCTO (oculto para cocinero: solo ve detalle) -->
+        {% if rol_nombre != 'cocinero' %}
+        <div class="col-lg-4">
+            <div class="card card-soft">
+                <div class="card-header bg-white">
+                    <h5 class="fw-bold mb-1">
+                        <i class="bi bi-plus-circle text-success me-1"></i> Agregar producto
+                    </h5>
+                    <p class="text-muted small mb-0">Gestión de comanda</p>
+                </div>
+
+                <div class="card-body">
+
+                    <!-- FILTROS -->
+                    <div class="category-filters mb-4">
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{% url 'pedidos:detalle' pedido.id %}"
+                                   class="btn btn-sm {% if not categoria_id %}btn-primary text-white shadow-sm{% else %}btn-outline-primary{% endif %}">
+                                    Todos
+                                </a>
+                                <a href="{% url 'pedidos:detalle' pedido.id %}?corriente=1"
+                                   class="btn btn-sm {% if show_corriente %}btn-success text-white shadow-sm{% else %}btn-outline-success{% endif %}">
+                                    Corriente
+                                </a>
+                                <a href="{% url 'pedidos:detalle' pedido.id %}?desayuno=1"
+                                   class="btn btn-sm {% if show_desayuno %}btn-warning text-dark shadow-sm{% else %}btn-outline-warning{% endif %}">
+                                    Desayuno
+                                </a>
+                                {% if categoria_snacks %}
+                                <a href="{% url 'pedidos:detalle' pedido.id %}?categoria={{ categoria_snacks.id }}"
+                                   class="btn btn-sm {% if categoria_id|stringformat:'s' == categoria_snacks.id|stringformat:'s' %}btn-primary text-white shadow-sm{% else %}btn-outline-primary{% endif %}">
+                                    Snacks
+                                </a>
+                                {% endif %}
+                                {% for cat in categorias %}
+                                    {# Evita duplicar la categoría Corriente en los filtros #}
+                                    {% if cat.nombre != 'Corriente' and cat.nombre != 'Snacks' %}
+                                        <a href="{% url 'pedidos:detalle' pedido.id %}?categoria={{ cat.id }}"
+                                           class="btn btn-sm {% if categoria_id|stringformat:'s' == cat.id|stringformat:'s' %}btn-primary text-white shadow-sm{% else %}btn-outline-primary{% endif %}">
+                                            {{ cat.nombre }}
+                                        </a>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <form method="get" action="{% url 'pedidos:detalle' pedido.id %}" class="d-flex gap-2 mt-2">
+                                {% if categoria_id %}
+                                    <input type="hidden" name="categoria" value="{{ categoria_id }}">
+                                {% endif %}
+                                {% if show_corriente %}
+                                    <input type="hidden" name="corriente" value="1">
+                                {% endif %}
+                                {% if show_desayuno %}
+                                    <input type="hidden" name="desayuno" value="1">
+                                {% endif %}
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                                    <input type="text" name="q" class="form-control border-start-0" placeholder="Buscar producto..." value="{{ query }}">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- FORM GENERAL -->
+                    <form method="post" class="mb-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="tipo_form" value="general">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-uppercase opacity-75">Producto</label>
+                            <select name="producto" class="form-select rounded-pill shadow-sm" required>
+                                <option value="">Seleccionar producto</option>
+                                {% for prod in productos %}
+                                    <option value="{{ prod.id }}">
+                                        {{ prod.nombre }} · ${{ prod.precio|pesos }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-uppercase opacity-75">Cantidad</label>
+                            <input type="number" name="cantidad" class="form-control rounded-pill shadow-sm" value="1" min="1" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-uppercase opacity-75">Observaciones</label>
+                            <textarea name="observaciones" class="form-control rounded-4 shadow-sm" rows="2" placeholder="Notas de cocina..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 rounded-pill fw-bold py-2 shadow-sm">
+                            <i class="bi bi-cart-plus me-1"></i> Agregar al pedido
+                        </button>
+                    </form>
+
+                    {% if menu_corriente and show_corriente %}
+                    <div class="mt-4 pt-4 border-top">
+                        <h6 class="fw-bold text-success mb-3">Opciones Corriente</h6>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="tipo_form" value="corriente">
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Sopa</label>
+                                <select name="corr_sopa" class="form-select form-select-sm rounded-pill shadow-sm">
+                                    <option value="">Seleccionar</option>
+                                    <option value="Sin sopa">Sin sopa</option>
+                                    {# Si hay varias sopas configuradas (separadas por comas), listarlas todas #}
+                                    {% if menu_corriente.sopas %}
+                                        {% for s in menu_corriente.sopas %}
+                                            <option value="{{ s }}">{{ s }}</option>
+                                        {% endfor %}
+                                    {% elif menu_corriente.sopa %}
+                                        <option value="{{ menu_corriente.sopa }}">{{ menu_corriente.sopa }}</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Principio</label>
+                                <select name="corr_principio" class="form-select form-select-sm rounded-pill shadow-sm">
+                                    <option value="">Seleccionar</option>
+                                    {% for p in menu_corriente.principio %}
+                                        <option value="{{ p }}">{{ p }}</option>
+                                    {% endfor %}
+                                
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Proteína</label>
+                                <select name="corr_proteina" class="form-select form-select-sm rounded-pill shadow-sm">
+                                    <option value="">Seleccionar</option>
+                                    {% for p in menu_corriente.proteina %}
+                                        <option value="{{ p }}">{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Acompañante</label>
+                                <input type="text" name="corr_acompanante" class="form-control form-control-sm rounded-pill shadow-sm" value="{{ menu_corriente.acompanante }}">
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Cantidad</label>
+                                <input type="number" name="cantidad" class="form-control form-control-sm rounded-pill shadow-sm" value="1" min="1" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Observaciones</label>
+                                <textarea name="observaciones" class="form-control rounded-4 shadow-sm" rows="2" placeholder="Detalles extra..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-outline-success w-100 rounded-pill fw-bold shadow-sm">
+                                <i class="bi bi-basket2-fill me-1"></i> Agregar corriente
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    {% if menu_desayuno and show_desayuno %}
+                    <div class="mt-4 pt-4 border-top">
+                        <h6 class="fw-bold text-warning mb-3">Opciones Desayuno</h6>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="tipo_form" value="desayuno">
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Principal</label>
+                                <select name="des_principal" class="form-select form-select-sm rounded-pill shadow-sm">
+                                    <option value="">Seleccionar</option>
+                                    {% for p in menu_desayuno.principales %}
+                                        <option value="{{ p }}">{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Bebida</label>
+                                <select name="des_bebida" class="form-select form-select-sm rounded-pill shadow-sm">
+                                    <option value="">Seleccionar</option>
+                                    {% for b in menu_desayuno.bebidas %}
+                                        <option value="{{ b }}">{{ b }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Acompañante</label>
+                                <input type="text" name="des_acompanante" class="form-control form-control-sm rounded-pill shadow-sm" value="{{ menu_desayuno.acompanante }}">
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-semibold small">Cantidad</label>
+                                <input type="number" name="cantidad" class="form-control form-control-sm rounded-pill shadow-sm" value="1" min="1" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Observaciones</label>
+                                <textarea name="observaciones" class="form-control rounded-4 shadow-sm" rows="2" placeholder="Detalles extra..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-warning w-100 rounded-pill fw-bold shadow-sm">
+                                <i class="bi bi-egg-fried me-1"></i> Agregar desayuno
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <a href="{% url 'pedidos:lista' %}"
+               class="btn btn-outline-secondary border-0 w-100 mt-3 rounded-pill">
+                <i class="bi bi-arrow-left me-1"></i> Volver al listado
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tbody = document.getElementById('detalleTbody');
+        const totalLabel = document.getElementById('pedidoTotalLabel');
+        const parcialUrl = "{% url 'pedidos:detalle_parcial' pedido.id %}";
+
+        async function refrescarDetalle() {
+            try {
+                const resp = await fetch(parcialUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.tbody && tbody) {
+                    tbody.innerHTML = data.tbody;
+                }
+                if (data.total !== undefined && totalLabel) {
+                    const valor = Number(data.total) || 0;
+                    totalLabel.textContent = '$ ' + valor.toLocaleString('es-CO');
+                }
+            } catch (err) {
+                console.warn('No se pudo actualizar el detalle', err);
+            }
+        }
+
+        // Refresco ligero cada 12s para no saturar el servidor
+        setInterval(refrescarDetalle, 12000);
+    });
+    </script>
+
+    {% endwith %}
+</div>
+{% endblock %}

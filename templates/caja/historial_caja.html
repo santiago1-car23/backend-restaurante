@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Historial de Cierres de Caja{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --caja-bg: #f8f9fa;
+        --caja-border-radius: 12px;
+        --caja-accent: #0d6efd;
+    }
+
+    .card-caja {
+        border: none;
+        border-radius: var(--caja-border-radius);
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        background-color: #ffffff;
+        overflow: hidden;
+    }
+
+    .table thead th {
+        background-color: #f1f4f9;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.025em;
+        font-weight: 700;
+        color: #495057;
+        border-bottom-width: 1px;
+        padding: 12px 16px;
+    }
+
+    .table tbody td {
+        padding: 14px 16px;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .badge-status {
+        padding: 0.5em 0.8em;
+        font-weight: 500;
+        border-radius: 6px;
+    }
+
+    .btn-action {
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .filter-label {
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 4px;
+    }
+
+    .money-column {
+        font-family: 'Courier New', Courier, monospace;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 pb-5">
+    <!-- Encabezado con mejor jerarquía -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="bi bi-journal-text text-primary me-2"></i>Historial de Caja
+            </h2>
+            <p class="text-muted mb-0">Control detallado de sesiones, ingresos y egresos registrados.</p>
+        </div>
+        <a href="{% url 'caja:index' %}" class="btn btn-white border shadow-sm px-3 btn-action">
+            <i class="bi bi-arrow-left me-1"></i> Volver a Caja
+        </a>
+    </div>
+
+    <!-- Filtros optimizados -->
+    <div class="card card-caja p-4 mb-4">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="filter-label small">Desde</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-event"></i></span>
+                    <input type="date" name="desde" value="{{ filtro_desde }}" class="form-control border-start-0">
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="filter-label small">Hasta</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-check"></i></span>
+                    <input type="date" name="hasta" value="{{ filtro_hasta }}" class="form-control border-start-0">
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="filter-label small">Estado de Sesión</label>
+                <select name="estado" class="form-select form-select-sm">
+                    <option value="todas" {% if filtro_estado == 'todas' %}selected{% endif %}>Todas</option>
+                    <option value="abierta" {% if filtro_estado == 'abierta' %}selected{% endif %}>Abiertas</option>
+                    <option value="cerrada" {% if filtro_estado == 'cerrada' %}selected{% endif %}>Cerradas</option>
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm px-4 btn-action">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+                <a href="{% url 'caja:historial_caja' %}" class="btn btn-light btn-sm px-3 btn-action border">
+                    <i class="bi bi-eraser"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de resultados -->
+    <div class="card card-caja">
+        {% if sesiones %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Apertura</th>
+                        <th>Cierre</th>
+                        <th>Responsables</th>
+                        <th>Estado</th>
+                        <th class="text-end">Base</th>
+                        <th class="text-end">Facturado</th>
+                        <th class="text-end">Salidas</th>
+                        <th class="text-end">Resultado Neto</th>
+                        <th class="text-center pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sesiones %}
+                    <tr>
+                        <td class="ps-4 text-muted fw-bold">#{{ s.id }}</td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span>{{ s.fecha_apertura|date:"d/m/Y" }}</span>
+                                <small class="text-muted">{{ s.fecha_apertura|date:"H:i" }} hs</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if s.fecha_cierre %}
+                            <div class="d-flex flex-column">
+                                <span>{{ s.fecha_cierre|date:"d/m/Y" }}</span>
+                                <small class="text-muted">{{ s.fecha_cierre|date:"H:i" }} hs</small>
+                            </div>
+                            {% else %}
+                            <span class="text-muted">--:--</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="small"><i class="bi bi-person-up text-primary me-1"></i>{{ s.usuario_apertura.get_full_name|default:s.usuario_apertura.username }}</span>
+                                {% if s.usuario_cierre %}
+                                <span class="small"><i class="bi bi-person-down text-secondary me-1"></i>{{ s.usuario_cierre.get_full_name|default:s.usuario_cierre.username }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if s.estado == 'abierta' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle badge-status">
+                                    <i class="bi bi-unlock-fill me-1"></i> Abierta
+                                </span>
+                            {% else %}
+                                <span class="badge bg-light text-secondary border badge-status">
+                                    <i class="bi bi-lock-fill me-1"></i> Cerrada
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end money-column text-muted">${{ s.saldo_inicial|default:0|pesos }}</td>
+                        <td class="text-end money-column">${{ s.total_facturado|default:0|pesos }}</td>
+                        <td class="text-end money-column text-danger">-${{ s.salidas|default:0|pesos }}</td>
+                        <td class="text-end money-column {% if s.resultado_neto >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            ${{ s.resultado_neto|pesos }}
+                        </td>
+                        <td class="text-center pe-4">
+                            <a href="{% url 'caja:resumen_caja' s.id %}" class="btn btn-sm btn-primary btn-action shadow-sm px-3">
+                                <i class="bi bi-eye me-1"></i> Resumen
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox text-muted display-4"></i>
+            <p class="text-muted mt-3 mb-0">No se encontraron sesiones de caja con los filtros seleccionados.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Mesas{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary: #0093af;
+        --success: #0093af;
+        --danger: #ff7675;
+        --dark: #2d3436;
+        --shadow: 0 15px 40px -12px rgba(0,0,0,.15);
+    }
+
+    /* Card Mesa */
+    .mesa-card {
+        background: rgba(255, 255, 255, 0.9); /* Un poco de transparencia */
+        backdrop-filter: blur(5px); /* Efecto de desenfoque moderno */
+        border-radius: 22px;
+        box-shadow: var(--shadow);
+        padding: 1.8rem 1.4rem;
+        position: relative;
+        text-align: center;
+        transition: .25s;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .mesa-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 25px 55px -18px rgba(0,0,0,.25);
+    }
+
+    .estado-bar {
+        height: 7px;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+    .estado-libre { background: var(--success); }
+    .estado-ocupada { background: var(--danger); }
+
+    .mesa-icon {
+        font-size: 3rem;
+        opacity: .15;
+        position: absolute;
+        bottom: -10px;
+        right: -10px;
+    }
+
+    .mesa-numero {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--dark);
+    }
+
+    .btn-outline-primary {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .btn-outline-primary:hover,
+    .btn-outline-primary:focus {
+        background-color: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold mb-0">Gestión de Mesas</h1>
+            <small class="text-muted">Estado y control del restaurante</small>
+        </div>
+    </div>
+
+    <div class="row g-4" id="mesas-container">
+        {% for mesa in mesas %}
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <div class="mesa-card">
+                <div class="estado-bar {% if mesa.estado == 'ocupada' %}estado-ocupada{% else %}estado-libre{% endif %}"></div>
+                <div class="mesa-icon">
+                    <i class="bi bi-chair"></i>
+                </div>
+                <div class="mt-3">
+                    <i class="bi bi-table fs-1 {% if mesa.estado == 'ocupada' %}text-danger{% else %}text-success{% endif %} opacity-75"></i>
+                </div>
+                <h3 class="mesa-numero mt-2">Mesa #{{ mesa.numero }}</h3>
+                <p class="text-muted mb-2">Capacidad: {{ mesa.capacidad }} personas</p>
+                <span class="badge rounded-pill px-3 py-2 bg-white
+                    {% if mesa.estado == 'libre' %}border border-success text-success
+                    {% elif mesa.estado == 'ocupada' %}border border-danger text-danger
+                    {% else %}border border-warning text-warning{% endif %}">
+                    {{ mesa.get_estado_display }}
+                </span>
+
+                <form method="post" action="{% url 'mesas:cambiar_estado' mesa.id %}" class="mt-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="{% if mesa.estado == 'libre' %}ocupar{% else %}liberar{% endif %}">
+                    <button class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold">
+                        {% if mesa.estado == 'libre' %}
+                            <i class="bi bi-person-check"></i> Ocupar
+                        {% else %}
+                            <i class="bi bi-check-circle"></i> Liberar
+                        {% endif %}
+                    </button>
+                </form>
+
+                {% if request.user.is_staff %}
+                <form method="post" action="{% url 'mesas:eliminar' mesa.id %}"
+                      class="mt-2"
+                      onsubmit="return confirm('¿Eliminar la mesa #{{ mesa.numero }}?');">
+                    {% csrf_token %}
+                    <button class="btn btn-outline-danger btn-sm w-100 rounded-pill">
+                        <i class="bi bi-trash"></i> Eliminar mesa
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-light text-center py-5 rounded-4 shadow-sm">
+                <p class="text-muted mt-2 mb-0">No hay mesas registradas</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if request.user.is_staff %}
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6 col-lg-5">
+            <div class="card p-4 shadow-lg border-0 rounded-4" style="background: rgba(255,255,255,0.9);">
+                <h5 class="fw-bold mb-3"><i class="bi bi-plus-circle text-success"></i> Nueva Mesa</h5>
+                <form method="post" action="{% url 'mesas:crear' %}">
+                    {% csrf_token %}
+                    <input type="number" name="numero" class="form-control mb-3 rounded-pill" placeholder="Número de mesa" required>
+                    <button class="btn btn-success w-100 rounded-pill fw-bold">Crear mesa</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <script>
+    // --- Actualización en vivo del estado de las mesas ---
+    function tarjetaMesaHtml(mesa) {
+        const esOcupada = mesa.estado === 'ocupada';
+        const barClass = esOcupada ? 'estado-ocupada' : 'estado-libre';
+        const iconClass = esOcupada ? 'text-danger' : 'text-success';
+        let badgeClass = 'bg-white border border-warning text-warning';
+        if (mesa.estado === 'libre') badgeClass = 'bg-white border border-success text-success';
+        else if (mesa.estado === 'ocupada') badgeClass = 'bg-white border border-danger text-danger';
+
+        const accion = mesa.estado === 'libre' ? 'ocupar' : 'liberar';
+        const textoAccion = mesa.estado === 'libre' ? 'Ocupar' : 'Liberar';
+        const iconAccion = mesa.estado === 'libre' ? 'bi-person-check' : 'bi-check-circle';
+
+        return `
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <div class="mesa-card">
+                <div class="estado-bar ${barClass}"></div>
+                <div class="mesa-icon">
+                    <i class="bi bi-chair"></i>
+                </div>
+                <div class="mt-3">
+                    <i class="bi bi-table fs-1 ${iconClass} opacity-75"></i>
+                </div>
+                <h3 class="mesa-numero mt-2">Mesa #${mesa.numero}</h3>
+                <p class="text-muted mb-2">Capacidad: ${mesa.capacidad} personas</p>
+                <span class="badge rounded-pill px-3 py-2 ${badgeClass}">
+                    ${mesa.estado_display}
+                </span>
+
+                <form method="post" action="{% url 'mesas:cambiar_estado' 0 %}" class="mt-3">`.replace('0', mesa.id) + `
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="${accion}">
+                    <button class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold">
+                        <i class="bi ${iconAccion}"></i> ${textoAccion}
+                    </button>
+                </form>
+
+                {% if request.user.is_staff %}
+                <form method="post" action="{% url 'mesas:eliminar' 0 %}" class="mt-2" onsubmit="return confirm('¿Eliminar la mesa #${mesa.numero}?');">`.replace('0', mesa.id) + `
+                    {% csrf_token %}
+                    <button class="btn btn-outline-danger btn-sm w-100 rounded-pill">
+                        <i class="bi bi-trash"></i> Eliminar mesa
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>`;
+    }
+
+    async function actualizarMesas() {
+        const cont = document.getElementById('mesas-container');
+        if (!cont) return;
+        try {
+            const resp = await fetch("{% url 'mesas:lista_json' %}");
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const mesas = data.mesas || [];
+
+            if (mesas.length === 0) {
+                cont.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-light text-center py-5 rounded-4 shadow-sm">
+                        <p class="text-muted mt-2 mb-0">No hay mesas registradas</p>
+                    </div>
+                </div>`;
+                return;
+            }
+
+            cont.innerHTML = '';
+            mesas.forEach(m => {
+                cont.insertAdjacentHTML('beforeend', tarjetaMesaHtml(m));
+            });
+        } catch (e) {
+            console.error('Error actualizando mesas:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setInterval(actualizarMesas, 3000); // cada 3 segundos
+    });
+</script>
+{% endblock %}

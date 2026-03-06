@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Teléfono | {{ telefono.nombre }}{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --accent-color: #0093af; /* Verde para diferenciar líneas telefónicas */
+        --bg-light: #f8fafc;
+    }
+    .card-edit {
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .input-group-text {
+        background-color: transparent;
+        color: #94a3b8;
+        border-right: none;
+    }
+    .form-control {
+        border-left: none;
+        padding-left: 0.5rem;
+    }
+    .form-control:focus + .input-group-text, 
+    .input-group:focus-within .input-group-text {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+    }
+    .btn-save {
+        background-color: var(--accent-color);
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        color: white;
+        transition: all 0.2s;
+    }
+    .btn-save:hover {
+        background-color: #007a8a;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        color: white;
+    }
+    .btn-cancel {
+        border-radius: 10px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+    }
+    .icon-box-tel {
+        background-color: #ecfdf5;
+        color: #0093af;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-6">
+            
+            <!-- Encabezado de retorno -->
+            <div class="mb-4 text-center text-md-start">
+                <a href="{% url 'contactos:index' %}" class="text-decoration-none text-muted small fw-bold">
+                    <i class="bi bi-chevron-left me-1"></i> VOLVER AL DIRECTORIO
+                </a>
+            </div>
+
+            <div class="card card-edit shadow-lg border-0">
+                <div class="card-header bg-white border-0 pt-4 px-4 text-center">
+                    <div class="icon-box-tel p-3 rounded-circle d-inline-flex mb-3">
+                        <i class="bi bi-telephone-outbound fs-3"></i>
+                    </div>
+                    <h1 class="h4 fw-bold mb-1">Editar Línea de Contacto</h1>
+                    <p class="text-muted small">Modifica los detalles de la línea: <strong>{{ telefono.nombre }}</strong></p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Nombre de la línea -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-secondary">Etiqueta o Nombre</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                <input type="text" name="nombre" class="form-control" value="{{ telefono.nombre }}" placeholder="Ej: Recepción, Delivery, Urgencias" required>
+                            </div>
+                            <div class="form-text small">Identifica para qué se usa este número.</div>
+                        </div>
+
+                        <!-- Número -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-secondary">Número de Teléfono</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-hash"></i></span>
+                                <input type="text" name="numero" class="form-control" value="{{ telefono.numero }}" placeholder="Ej: +54 9 11 1234 5678" required>
+                            </div>
+                        </div>
+
+                        <!-- Notas -->
+                        <div class="mb-5">
+                            <label class="form-label small fw-bold text-secondary">Notas / Horarios</label>
+                            <textarea name="notas" rows="3" class="form-control bg-light border-0 p-3" style="border-left: none !important; padding-left: 1rem !important;" placeholder="Ej: Disponible de 08:00 a 20:00. Solo WhatsApp.">{{ telefono.notas }}</textarea>
+                        </div>
+
+                        <!-- Acciones -->
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-save w-100 mb-2">
+                                    <i class="bi bi-check-circle me-2"></i>Actualizar Teléfono
+                                </button>
+                            </div>
+                            <div class="col-12 text-center">
+                                <a href="{% url 'contactos:index' %}" class="btn btn-light btn-cancel w-100">
+                                    Descartar cambios
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

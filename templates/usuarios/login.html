@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login | Restaurante{% endblock %}
+
+{% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
+
+<div id="particles-js"></div>
+<div class="login-bg-image"></div>
+
+<div class="login-wrapper">
+    <div class="login-card glass-effect" id="loginCard" data-tilt data-tilt-max="10" data-tilt-speed="400" data-tilt-glare data-tilt-max-glare="0.2">
+        
+        <div class="text-center mb-4 header-section">
+            <div class="login-icon animate-pop">
+                <i class="bi bi-shop-window"></i>
+            </div>
+            <h3 class="fw-bold mb-1 text-white">Bienvenido</h3>
+            <p class="text-white-50 small">Panel de Restaurante</p>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger alert-dismissible fade show error-shake glass-alert" role="alert">
+                {% for error in form.non_field_errors %}
+                    <div><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}</div>
+                {% endfor %}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
+
+        <form method="POST" novalidate autocomplete="off">
+            {% csrf_token %}
+
+            <div class="form-floating mb-3 input-group-custom">
+                <input 
+                    type="text"
+                    name="username"
+                    class="form-control glass-input {% if form.username.errors %}is-invalid{% endif %}"
+                    id="id_username"
+                    placeholder="Usuario"
+                    required
+                >
+                <label for="id_username">
+                    <i class="bi bi-person me-1"></i> Usuario
+                </label>
+                {% if form.username.errors %}
+                    <div class="invalid-feedback text-warning ms-2 fw-bold">
+                        {{ form.username.errors.0 }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-floating mb-4 position-relative input-group-custom">
+                <input 
+                    type="password"
+                    name="password"
+                    class="form-control glass-input {% if form.password.errors %}is-invalid{% endif %}"
+                    id="id_password"
+                    placeholder="Contraseña"
+                    required
+                >
+                <label for="id_password">
+                    <i class="bi bi-lock me-1"></i> Contraseña
+                </label>
+
+                <span class="toggle-password" onclick="togglePassword()" title="Ver contraseña">
+                    <i class="bi bi-eye"></i>
+                </span>
+
+                {% if form.password.errors %}
+                    <div class="invalid-feedback text-warning ms-2 fw-bold">
+                        {{ form.password.errors.0 }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-login w-100 py-2 mb-3 glow-on-hover">
+                <span>Ingresar</span> <i class="bi bi-arrow-right-short ms-2"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+/* --- 1. CONFIGURACIÓN GENERAL --- */
+:root {
+    --primary-color: #0093af;
+    --accent-color: #ff6b6b;
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+}
+
+body {
+    overflow: hidden; /* Evita scrollbars por las animaciones */
+    background: #0f172a; /* Fondo oscuro de respaldo */
+}
+
+/* --- 2. FONDO Y PARTÍCULAS --- */
+.login-bg-image {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    /* Imagen de restaurante oscura y elegante */
+    background: url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1920&auto=format&fit=crop') no-repeat center center;
+    background-size: cover;
+    z-index: -2;
+    filter: brightness(0.4); /* Oscurecer imagen para que resalten las partículas */
+}
+
+#particles-js {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: -1;
+}
+
+/* --- 3. TARJETA GLASSMORPHISM (VIDRIO) --- */
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 3rem 2.5rem;
+    border-radius: 20px;
+    
+    /* Efecto Vidrio */
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px); /* Desenfoque potente */
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    
+    /* Preparar para Tilt 3D */
+    transform-style: preserve-3d;
+    transform: perspective(1000px);
+}
+
+/* --- 4. ICONO ANIMADO --- */
+.login-icon {
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(135deg, var(--primary-color), #00c6ff);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin: 0 auto 15px;
+    box-shadow: 0 0 20px rgba(0, 147, 175, 0.5);
+    transform: translateZ(20px); /* Efecto 3D: el icono sobresale */
+}
+
+.animate-pop {
+    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+    0% { transform: scale(0) translateZ(0); opacity: 0; }
+    100% { transform: scale(1) translateZ(20px); opacity: 1; }
+}
+
+/* --- 5. INPUTS MODERNOS --- */
+.glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff !important;
+    border-radius: 10px;
+    padding-right: 40px;
+    transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(0, 147, 175, 0.3);
+    color: #fff;
+}
+
+.glass-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+
+/* Etiquetas flotantes */
+.form-floating label { color: rgba(255, 255, 255, 0.6); }
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    color: var(--primary-color);
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+/* Autocomplete fix para fondo oscuro */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active{
+    -webkit-box-shadow: 0 0 0 30px #232b38 inset !important;
+    -webkit-text-fill-color: white !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* --- 6. BOTÓN NEÓN --- */
+.btn-login {
+    background: linear-gradient(90deg, var(--primary-color), #00d2ff);
+    border: none;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-radius: 50px;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.btn-login:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(0, 147, 175, 0.6);
+    color: white;
+}
+
+/* Efecto brillo al pasar */
+.glow-on-hover::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: 0.5s;
+}
+.glow-on-hover:hover::before { left: 100%; }
+
+/* --- 7. UTILIDADES --- */
+.toggle-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 10;
+}
+.toggle-password:hover { color: #fff; }
+
+.glass-alert {
+    background: rgba(220, 53, 69, 0.2);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    color: #ffcccc;
+}
+
+/* Shake Animation */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+.error-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+.navbar, footer { display: none; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // 1. Inicializar Particles.js (El fondo de red en movimiento)
+    particlesJS("particles-js", {
+        "particles": {
+            "number": { "value": 60, "density": { "enable": true, "value_area": 800 } },
+            "color": { "value": "#ffffff" },
+            "shape": { "type": "circle" },
+            "opacity": { "value": 0.2, "random": false },
+            "size": { "value": 3, "random": true },
+            "line_linked": { "enable": true, "distance": 150, "color": "#ffffff", "opacity": 0.15, "width": 1 },
+            "move": { "enable": true, "speed": 2, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false }
+        },
+        "interactivity": {
+            "detect_on": "canvas",
+            "events": {
+                "onhover": { "enable": true, "mode": "grab" },
+                "onclick": { "enable": true, "mode": "push" },
+                "resize": true
+            },
+            "modes": {
+                "grab": { "distance": 140, "line_linked": { "opacity": 0.5 } }
+            }
+        },
+        "retina_detect": true
+    });
+
+    // 2. Manejo de errores (Animación shake)
+    const hasErrors = document.querySelector('.alert-danger') || document.querySelector('.is-invalid');
+    const card = document.getElementById('loginCard');
+    
+    if (hasErrors && card) {
+        card.classList.add('error-shake');
+        setTimeout(() => card.classList.remove('error-shake'), 500);
+    }
+});
+
+// 3. Toggle Password Lógico
+function togglePassword() {
+    const input = document.getElementById("id_password");
+    const icon = document.querySelector(".toggle-password i");
+
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+        icon.style.color = "#00c6ff";
+    } else {
+        input.type = "password";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+        icon.style.color = "";
+    }
+}
+</script>
+{% endblock %}

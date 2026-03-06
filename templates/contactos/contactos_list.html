@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+
+{% block title %}Contactos de Negocio{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-soft: #eef2ff;
+        --accent-color: #4f46e5;
+    }
+    .card { border-radius: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07) !important; }
+    
+    /* Avatares con iniciales */
+    .avatar-circle {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+    }
+    .bg-alimentos { background-color: #f59e0b; }
+    .bg-bebidas { background-color: #3b82f6; }
+    .bg-limpieza { background-color: #10b981; }
+    .bg-tecnologia { background-color: #8b5cf6; }
+    .bg-otros { background-color: #6b7280; }
+
+    .table thead th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+        border-top: none;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 0.2rem rgba(79, 70, 229, 0.1);
+    }
+
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+</style>
+
+<div class="container-py-4">
+    <!-- Header de la sección -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 fw-bold text-dark mb-1">Directorio de Contactos</h1>
+            <p class="text-secondary">Gestión centralizada de proveedores y líneas directas del negocio.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <span class="badge bg-white text-dark border shadow-sm px-3 py-2">
+                <i class="bi bi-people me-2"></i>{{ proveedores|length }} Proveedores registrados
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- SECCIÓN PROVEEDORES -->
+        <div class="col-12 col-xl-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4 d-flex align-items-center">
+                    <div class="icon-box bg-primary-subtle text-primary p-2 rounded-3 me-3">
+                        <i class="bi bi-truck fs-5"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold">Gestión de Proveedores</h5>
+                </div>
+                
+                <div class="card-body px-4">
+                    <!-- Formulario Nuevo Proveedor -->
+                    <div class="bg-light p-3 rounded-3 mb-4 border border-dashed">
+                        <form method="post" class="row g-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="proveedor">
+                            
+                            <div class="col-md-5">
+                                <label class="small fw-bold text-muted mb-1">Nombre Comercial</label>
+                                <input type="text" name="nombre" class="form-control" placeholder="Nombre del proveedor" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold text-muted mb-1">Categoría</label>
+                                <select name="tipo" class="form-select">
+                                    <option value="alimentos">Alimentos</option>
+                                    <option value="bebidas">Bebidas</option>
+                                    <option value="limpieza">Limpieza</option>
+                                    <option value="tecnologia">Tecnología</option>
+                                    <option value="otros" selected>Otros</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted mb-1">Teléfono</label>
+                                <input type="text" name="telefono" class="form-control" placeholder="Ej: +54 9...">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="email" name="email" class="form-control" placeholder="Email (opcional)">
+                            </div>
+                            <div class="col-md-8">
+                                <input type="text" name="direccion" class="form-control" placeholder="Dirección del local">
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                                    <i class="bi bi-plus-lg me-2"></i>Registrar Proveedor
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Lista de Proveedores (colapsable) -->
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small text-muted">Proveedores guardados</span>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#listaProveedores" aria-expanded="false" aria-controls="listaProveedores">
+                            <i class="bi bi-chevron-down"></i> Ver/Ocultar
+                        </button>
+                    </div>
+
+                    <div class="collapse" id="listaProveedores">
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Proveedor</th>
+                                        <th class="d-none d-md-table-cell">Contacto</th>
+                                        <th>Categoría</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="border-top-0">
+                                    {% for p in proveedores %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar-circle bg-{{ p.tipo|default:'otros' }} me-3 shadow-sm">
+                                                    {{ p.nombre|slice:":1" }}
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark">{{ p.nombre }}</div>
+                                                    <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ p.direccion|default:"Sin dirección" }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="d-none d-md-table-cell">
+                                            {% if p.telefono %}
+                                            <div class="small"><i class="bi bi-telephone me-2 text-primary"></i>{{ p.telefono }}</div>
+                                            {% endif %}
+                                            {% if p.email %}
+                                            <div class="small text-muted"><i class="bi bi-envelope me-2"></i>{{ p.email }}</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge rounded-pill bg-light text-dark border px-3">
+                                                {{ p.get_tipo_display }}
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-flex justify-content-end gap-1">
+                                                {% if p.telefono %}
+                                                <a href="tel:{{ p.telefono }}" class="btn btn-sm btn-outline-success btn-action" title="Llamar">
+                                                    <i class="bi bi-telephone-fill"></i>
+                                                </a>
+                                                {% endif %}
+                                                <a href="{% url 'contactos:proveedor_editar' p.id %}" class="btn btn-sm btn-outline-secondary btn-action" title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <form method="post" action="{% url 'contactos:proveedor_eliminar' p.id %}" onsubmit="return confirm('¿Eliminar este proveedor?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger btn-action" title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5">
+                                            <img src="https://illustrations.popsy.co/gray/box.svg" alt="vacio" style="height: 100px;">
+                                            <p class="text-muted mt-3">No hay proveedores registrados aún.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN TELÉFONOS NEGOCIO -->
+        <div class="col-12 col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4 d-flex align-items-center">
+                    <div class="icon-box bg-success-subtle text-success p-2 rounded-3 me-3">
+                        <i class="bi bi-telephone-plus fs-5"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold">Teléfonos del Negocio</h5>
+                </div>
+                
+                <div class="card-body px-4">
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="telefono">
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted mb-1">Nombre de la línea</label>
+                            <input type="text" name="nombre" class="form-control border-light-subtle bg-light" placeholder="Ej: Recepción, Delivery..." required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted mb-1">Número</label>
+                            <input type="text" name="numero" class="form-control border-light-subtle bg-light" placeholder="Número de contacto" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 shadow-sm">
+                            <i class="bi bi-plus-circle me-2"></i>Agregar Línea
+                        </button>
+                    </form>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small text-muted">Líneas guardadas</span>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#listaTelefonos" aria-expanded="false" aria-controls="listaTelefonos">
+                            <i class="bi bi-chevron-down"></i> Ver/Ocultar
+                        </button>
+                    </div>
+
+                    <div class="collapse" id="listaTelefonos">
+                        <div class="list-group list-group-flush border-top">
+                            {% for t in telefonos %}
+                            <div class="list-group-item px-0 py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1 fw-bold">{{ t.nombre }}</h6>
+                                    <p class="mb-0 text-primary small">{{ t.numero }}</p>
+                                    {% if t.notas %}
+                                    <small class="text-muted">{{ t.notas }}</small>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <a href="tel:{{ t.numero }}" class="btn btn-sm btn-outline-success btn-action">
+                                        <i class="bi bi-telephone-fill"></i>
+                                    </a>
+                                    <a href="{% url 'contactos:telefono_editar' t.id %}" class="btn btn-sm btn-outline-secondary btn-action">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{% url 'contactos:telefono_eliminar' t.id %}" onsubmit="return confirm('¿Eliminar?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-action">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-center py-4">
+                                <small class="text-muted">No hay líneas registradas.</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

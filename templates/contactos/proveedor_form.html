@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Proveedor | {{ proveedor.nombre }}{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --accent-color: #0093af;
+        --bg-light: #f8fafc;
+    }
+    .card-edit {
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .form-section-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        color: #64748b;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .input-group-text {
+        background-color: transparent;
+        color: #94a3b8;
+        border-right: none;
+    }
+    .form-control, .form-select {
+        border-left: none;
+        padding-left: 0;
+    }
+    .form-control:focus + .input-group-text, 
+    .input-group:focus-within .input-group-text {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+    }
+    .btn-save {
+        background-color: var(--accent-color);
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .btn-save:hover {
+        background-color: #007a8a;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .btn-cancel {
+        border-radius: 10px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            
+            <!-- Encabezado de retorno -->
+            <div class="mb-4">
+                <a href="{% url 'contactos:index' %}" class="text-decoration-none text-muted small fw-bold">
+                    <i class="bi bi-chevron-left me-1"></i> VOLVER AL DIRECTORIO
+                </a>
+            </div>
+
+            <div class="card card-edit shadow-lg border-0">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-primary-subtle text-primary p-3 rounded-4 me-3">
+                            <i class="bi bi-pencil-square fs-4"></i>
+                        </div>
+                        <div>
+                            <h1 class="h4 fw-bold mb-0">Modificar Proveedor</h1>
+                            <p class="text-muted small mb-0">Actualiza la información de contacto y detalles de {{ proveedor.nombre }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Información General -->
+                        <div class="form-section-title mt-2">Información Principal</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-12 col-md-8">
+                                <label class="form-label small fw-bold">Nombre del Proveedor</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-building"></i></span>
+                                    <input type="text" name="nombre" class="form-control" value="{{ proveedor.nombre }}" placeholder="Ej: Distribuidora Central" required>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label small fw-bold">Categoría / Tipo</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                    <select name="tipo" class="form-select">
+                                        {% for value, label in proveedor.TIPOS %}
+                                            <option value="{{ value }}" {% if proveedor.tipo == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contacto -->
+                        <div class="form-section-title">Datos de Contacto</div>
+                        <div class="row g-4 mb-5">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-bold">Teléfono Principal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                                    <input type="text" name="telefono" class="form-control" value="{{ proveedor.telefono }}" placeholder="+54 ...">
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-bold">Teléfono Alternativo</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                    <input type="text" name="telefono_secundario" class="form-control" value="{{ proveedor.telefono_secundario }}" placeholder="Opcional">
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-bold">Correo Electrónico</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                    <input type="email" name="email" class="form-control" value="{{ proveedor.email }}" placeholder="ejemplo@correo.com">
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-bold">Dirección Física</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                    <input type="text" name="direccion" class="form-control" value="{{ proveedor.direccion }}" placeholder="Calle, Ciudad, Provincia">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notas -->
+                        <div class="form-section-title">Observaciones Adicionales</div>
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <textarea name="notas" rows="4" class="form-control bg-light border-0 p-3" placeholder="Añade notas sobre horarios de entrega, personas de contacto específicas o acuerdos comerciales...">{{ proveedor.notas }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Acciones -->
+                        <div class="d-flex flex-column flex-md-row justify-content-end gap-3 pt-4 border-top">
+                            <a href="{% url 'contactos:index' %}" class="btn btn-light btn-cancel">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-save px-5">
+                                <i class="bi bi-cloud-check me-2"></i>Guardar Cambios
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Información de auditoría (opcional) -->
+            <div class="text-center mt-4">
+                <p class="text-muted small">Última actualización de este registro: <span class="fw-bold">{{ proveedor.updated_at|default:"Reciente" }}</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

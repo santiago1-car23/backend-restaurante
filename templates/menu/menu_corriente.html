@@ -1,0 +1,363 @@
+{% extends 'base.html' %}
+
+{% block title %}Menú Del Día{% endblock %}
+
+{% block content %}
+<!-- Estilos personalizados para esta vista -->
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #0093af 0%,#0093af 100%);
+        --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .page-header {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 2rem 1.5rem;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .date-picker-glass {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        border-radius: 0.5rem;
+    }
+    
+    .date-picker-glass::placeholder, .date-picker-glass {
+        color: white;
+    }
+    
+    /* Input date styling fix for webkit */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        cursor: pointer;
+    }
+
+    .menu-card {
+        border: none;
+        background: white;
+        box-shadow: var(--card-shadow);
+        transition: all 0.3s ease;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .menu-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .menu-icon-wrapper {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+
+    .badge-pill {
+        border-radius: 50px;
+        padding: 0.35em 0.8em;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        display: inline-block;
+    }
+
+    /* Colores específicos por categoría */
+    .type-sopa .menu-icon-wrapper { background: #fee2e2; color: #ef4444; }
+    .type-principio .menu-icon-wrapper { background: #fef3c7; color: #f59e0b; }
+    .type-proteina .menu-icon-wrapper { background: #d1fae5; color: #10b981; }
+    .type-extra .menu-icon-wrapper { background: #dbeafe; color:#0093af; }
+    .type-drink .menu-icon-wrapper { background: #f3e8ff; color: #8b5cf6; }
+
+    /* Formulario de edición */
+    .edit-panel {
+        background-color: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 1rem;
+    }
+
+    .price-card {
+        background: white;
+        border-left: 4px solid #0093af;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+</style>
+
+<div class="container py-4">
+    
+    <!-- Header Mejorado con Selector de Fecha -->
+    <div class="page-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <h2 class="fw-bold m-0"><i class="bi bi-journal-bookmark-fill me-2"></i>Menú Corriente</h2>
+            <p class="m-0 opacity-75 small">Gestiona y visualiza el menú del día</p>
+        </div>
+        
+        <form method="get" action="{% url 'menu:corriente' %}" class="d-flex align-items-center gap-2 bg-white bg-opacity-10 p-2 rounded-3">
+            <input type="date" name="fecha" class="form-control date-picker-glass border-0" value="{{ fecha }}" />
+            <button class="btn btn-light text-primary fw-bold shadow-sm" type="submit">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- Visualización del Menú -->
+    {% if menu %}
+    <div class="row g-4 mb-5">
+        <!-- Sopa -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="menu-card type-sopa p-4 d-flex align-items-start">
+                <div class="menu-icon-wrapper">
+                    <i class="bi bi-cup-hot-fill"></i>
+                </div>
+                <div>
+                    <h6 class="text-uppercase text-muted fw-bold small mb-2">Sopa</h6>
+                    <h5 class="fw-bold text-dark m-0">{{ menu.sopa|default:'—' }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <!-- Principios -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="menu-card type-principio p-4 d-flex align-items-start">
+                <div class="menu-icon-wrapper">
+                    <i class="bi bi-egg-fried"></i>
+                </div>
+                <div>
+                    <h6 class="text-uppercase text-muted fw-bold small mb-2">Principios</h6>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% if menu.principio %}
+                            {% for p in menu.principio %}
+                                <span class="badge badge-pill bg-warning text-dark shadow-sm">{{ p }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proteínas -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="menu-card type-proteina p-4 d-flex align-items-start">
+                <div class="menu-icon-wrapper">
+                    <i class="bi bi-collection-fill"></i>
+                </div>
+                <div>
+                    <h6 class="text-uppercase text-muted fw-bold small mb-2">Proteínas</h6>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% if menu.proteina %}
+                            {% for p in menu.proteina %}
+                                <span class="badge badge-pill bg-success text-white shadow-sm">{{ p }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acompañante -->
+        <div class="col-12 col-md-6">
+            <div class="menu-card type-extra p-4 d-flex align-items-center">
+                <div class="menu-icon-wrapper">
+                    <i class="bi bi-star-fill"></i>
+                </div>
+                <div class="w-100">
+                    <h6 class="text-uppercase text-muted fw-bold small mb-1">Acompañante General</h6>
+                    <div class="fs-5">{{ menu.acompanante|default:'—' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bebida -->
+        <div class="col-12 col-md-6">
+            <div class="menu-card type-drink p-4 d-flex align-items-center">
+                <div class="menu-icon-wrapper">
+                    <i class="bi bi-cup-straw"></i>
+                </div>
+                <div class="w-100">
+                    <h6 class="text-uppercase text-muted fw-bold small mb-1">Bebida / Limonada</h6>
+                    <div class="fs-5">{{ menu.limonada|default:'—' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-light border shadow-sm text-center py-5 rounded-4 mb-4">
+        <i class="bi bi-calendar-x fs-1 text-muted mb-3 d-block"></i>
+        <h4 class="fw-bold text-secondary">Sin menú configurado</h4>
+        <p class="text-muted">No se ha registrado un menú para el día <strong>{{ fecha }}</strong>.</p>
+    </div>
+    {% endif %}
+
+    <!-- Sección de Administración -->
+    {% if request.user.is_staff %}
+    <div class="edit-panel p-4 mt-5 position-relative">
+        <div class="position-absolute top-0 start-50 translate-middle">
+            <span class="bg-white px-3 py-1 border rounded-pill text-muted small fw-bold shadow-sm">
+                <i class="bi bi-pencil-square me-1"></i> MODO EDICIÓN
+            </span>
+        </div>
+
+        <h5 class="fw-bold mb-4 text-primary">Actualizar Menú: {{ fecha }}</h5>
+        
+        <form method="post" action="{% url 'menu:corriente' %}" class="row g-4 needs-validation" novalidate id="menuForm">
+            {% csrf_token %}
+            <input type="hidden" name="fecha" value="{{ fecha }}">
+            
+            <!-- Grupo Comida -->
+            <div class="col-12">
+                <h6 class="border-bottom pb-2 mb-3 text-uppercase small text-muted fw-bold">Platos</h6>
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Sopa</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-cup-hot"></i></span>
+                    <input class="form-control" name="sopa" value="{{ menu.sopa|default:'' }}" placeholder="Ej: Sancocho">
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Principios</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-egg-fried"></i></span>
+                          <!-- Convertimos lista a string separado por comas para el input -->
+                          <input class="form-control" name="principio" 
+                              value="{{ menu.principio|join:', ' }}" 
+                              placeholder="Frijoles, Lentejas (separa con comas)">
+                </div>
+                <div class="form-text small text-primary"><i class="bi bi-info-circle"></i> Separa opciones con comas.</div>
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Proteínas</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-collection"></i></span>
+                          <input class="form-control" name="proteina" 
+                              value="{{ menu.proteina|join:', ' }}" 
+                              placeholder="Pollo, Res, Cerdo (separa con comas)">
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Acompañante</label>
+                <input class="form-control" name="acompanante" value="{{ menu.acompanante|default:'' }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Limonada</label>
+                <input class="form-control" name="limonada" value="{{ menu.limonada|default:'' }}">
+            </div>
+
+            <!-- Grupo Precios -->
+            <div class="col-12 mt-4">
+                <h6 class="border-bottom pb-2 mb-3 text-uppercase small text-muted fw-bold">Configuración de Precios</h6>
+            </div>
+
+            <div class="col-md-4">
+                <div class="price-card">
+                    <label class="form-label small text-muted">Precio Sopa</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text border-0 bg-transparent fw-bold">$</span>
+                           <input class="form-control border-0 bg-transparent fw-bold fs-5 text-dark" name="precio_sopa" type="number" step="100" 
+                               value="{{ menu.precio_sopa }}">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="price-card" style="border-left-color: #a855f7;">
+                    <label class="form-label small text-muted">Precio Bandeja</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text border-0 bg-transparent fw-bold">$</span>
+                           <input class="form-control border-0 bg-transparent fw-bold fs-5 text-dark" name="precio_bandeja" type="number" step="100" 
+                               value="{{ menu.precio_bandeja }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="price-card" style="border-left-color: #10b981;">
+                    <label class="form-label small text-muted">Almuerzo Completo</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text border-0 bg-transparent fw-bold">$</span>
+                           <input class="form-control border-0 bg-transparent fw-bold fs-5 text-dark" name="precio_completo" type="number" step="100" 
+                               value="{{ menu.precio_completo }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 text-end mt-4">
+                <button type="submit" class="btn btn-primary btn-lg px-5 rounded-pill shadow hover-lift">
+                    <i class="bi bi-save2-fill me-2"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Scripts JavaScript para interactividad -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Animación suave al cargar elementos
+        const cards = document.querySelectorAll('.menu-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100); // Efecto cascada
+        });
+
+        // 2. Validación de formulario Bootstrap
+        const form = document.getElementById('menuForm');
+        if (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+                
+                // Efecto visual en el botón
+                const btn = form.querySelector('button[type="submit"]');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Guardando...';
+                // Si el submit es muy rápido, esto no se verá mucho, pero ayuda en UX
+            });
+        }
+
+        // 3. Formateo visual dinámico de los Inputs tipo "Etiquetas" (Proteína/Principio)
+        // Esto añade un pequeño efecto visual cuando el usuario escribe comas
+        const tagInputs = document.querySelectorAll('input[name="principio"], input[name="proteina"]');
+        
+        tagInputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                // Si quisiéramos hacer algo complejo como "chips" visuales en tiempo real,
+                // iría aquí. Por ahora, solo aseguramos que el usuario sepa que la coma separa.
+                if (e.target.value.includes(',,')) {
+                    e.target.value = e.target.value.replace(',,', ',');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

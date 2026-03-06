@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <title>{% block title %}Restaurante{% endblock %}</title>
+    
+    <!-- FUENTES -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- BOOTSTRAP 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- ICONOS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+    <meta name="theme-color" content="#0093af">
+    
+    <style>
+        /* VARIABLES Y TEMA */
+        :root {
+            --brand-color: #0093af;
+            --brand-dark: #007f96;
+            --accent-color: #f59e0b;
+            --sidebar-width: 260px;
+            --header-height-mobile: 60px;
+            --bottom-nav-height: 70px;
+            --bg-body: #f7f9fc;
+            --bg-sidebar: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow-base: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --shadow-card: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .dark-mode {
+            --brand-color: #0093af;
+            --brand-dark: #007f96;
+            --bg-body: #111827;
+            --bg-sidebar: #1f2937;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --shadow-base: 0 4px 15px rgba(0, 0, 0, 0.3);
+            --shadow-card: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Override global Bootstrap primary to use brand color */
+        .btn-primary {
+            background-color: var(--brand-color) !important;
+            border-color: var(--brand-color) !important;
+        }
+
+        .btn-primary:hover,
+        .btn-primary:focus,
+        .btn-primary:active {
+            background-color: var(--brand-dark) !important;
+            border-color: var(--brand-dark) !important;
+        }
+
+        .btn-outline-primary {
+            color: var(--brand-color) !important;
+            border-color: var(--brand-color) !important;
+        }
+
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active {
+            background-color: var(--brand-color) !important;
+            border-color: var(--brand-color) !important;
+            color: #ffffff !important;
+        }
+
+        .text-primary {
+            color: var(--brand-color) !important;
+        }
+
+        .bg-primary {
+            /* Mantener compatibilidad con utilidades bg-opacity de Bootstrap */
+            background-color: rgba(0, 147, 175, var(--bs-bg-opacity, 1)) !important;
+        }
+
+        .border-primary {
+            border-color: var(--brand-color) !important;
+        }
+
+        /* GENERAL Y TIPOGRAFÍA */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.4s ease, color 0.4s ease;
+            overscroll-behavior-y: none;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        a { text-decoration: none; transition: color 0.2s; }
+        .main-wrapper { transition: margin-left 0.3s ease, width 0.3s ease; }
+
+        /* Fondo con textura de puntos (noise) solo detrás del contenido */
+        .main-wrapper.noise-bg {
+            position: relative;
+            background-color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .main-wrapper.noise-bg::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background: #ffffff;
+            background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.55) 1px, transparent 0);
+            background-size: 20px 20px;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        .page-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Animación título de bienvenida */
+        .welcome-title {
+            position: relative;
+            display: inline-block;
+            transition: transform 0.18s ease, text-shadow 0.18s ease, letter-spacing 0.18s ease;
+        }
+
+        .welcome-title:hover {
+            transform: translateY(-2px) scale(1.02);
+            text-shadow: 0 0 12px rgba(0, 147, 175, 0.35);
+            letter-spacing: 0.03em;
+        }
+
+        /* Micro-animaciones de interacción */
+        .card-custom {
+            transform: translateY(0);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card-custom:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+        }
+
+        .nav-link-custom {
+            transition: background-color 0.18s ease, color 0.18s ease, transform 0.16s ease;
+        }
+
+        .nav-link-custom:hover {
+            background-color: rgba(99, 102, 241, 0.07);
+            color: var(--brand-dark);
+            transform: translateX(2px);
+        }
+
+        .bottom-nav-item {
+            transition: color 0.18s ease, transform 0.18s ease;
+        }
+
+        .bottom-nav-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn {
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.97) translateY(1px);
+            box-shadow: none !important;
+        }
+
+        /* SIDEBAR (Desktop) */
+        .sidebar { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            height: 100vh; 
+            min-width: var(--sidebar-width); 
+            width: var(--sidebar-width); 
+            background-color: var(--bg-sidebar); 
+            border-right: none; 
+            box-shadow: var(--shadow-base);
+            z-index: 1000; 
+            display: flex; 
+            flex-direction: column; 
+            transition: transform 0.3s ease; 
+        }
+        
+        .sidebar-brand { 
+            height: 70px; 
+            display: flex; 
+            align-items: center; 
+            padding: 0 1.5rem; 
+            font-size: 1.25rem; 
+            font-weight: 700; 
+            color: var(--brand-color); 
+            border-bottom: 1px solid var(--border-color); 
+            transition: transform 0.25s ease, color 0.25s ease, text-shadow 0.25s ease;
+        }
+
+        .sidebar-brand:hover {
+            transform: scale(1.03);
+            color: var(--brand-dark);
+            text-shadow: 0 0 10px rgba(0, 147, 175, 0.4);
+        }
+        
+        .sidebar-brand i { margin-right: 10px; font-size: 1.4rem; }
+        .sidebar-menu { flex: 1; padding: 1.5rem 1rem; overflow-y: auto; }
+        
+        .nav-link-custom { 
+            display: flex; 
+            align-items: center; 
+            padding: 0.8rem 1rem; 
+            margin-bottom: 0.5rem; 
+            color: var(--text-muted); 
+            border-radius: 0.5rem; 
+            font-weight: 500; 
+            transition: all 0.2s ease; 
+        }
+        
+        .nav-link-custom i { margin-right: 12px; font-size: 1.2rem; }
+        
+        .nav-link-custom:hover { 
+            background-color: rgba(99, 102, 241, 0.05);
+            color: var(--brand-dark); 
+        }
+        
+        .nav-link-custom.active { 
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.1), transparent);
+            color: var(--brand-color); 
+            font-weight: 600;
+            border-left: 4px solid var(--brand-color);
+            padding-left: calc(1rem - 4px);
+        }
+
+        .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border-color); }
+
+        /* MÓVIL / BOTTOM NAV */
+        .mobile-header { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            height: var(--header-height-mobile); 
+            background-color: var(--bg-sidebar); 
+            border-bottom: 1px solid var(--border-color); 
+            z-index: 990; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 1rem;
+            box-shadow: var(--shadow-base);
+        }
+
+        .bottom-nav { 
+            display: none; 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            height: var(--bottom-nav-height); 
+            background-color: var(--bg-sidebar); 
+            border-top: none; 
+            z-index: 990; 
+            justify-content: space-around; 
+            align-items: center; 
+            box-shadow: 0 -8px 30px rgba(0,0,0,0.1);
+        }
+        
+        .bottom-nav-item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            color: var(--text-muted); 
+            font-size: 0.75rem; 
+            font-weight: 500; 
+            flex: 1; 
+            height: 100%; 
+            transition: color 0.3s;
+        }
+        
+        .bottom-nav-item i { font-size: 1.4rem; margin-bottom: 4px; }
+        .bottom-nav-item.active { color: var(--brand-color); }
+
+        @keyframes fabPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .bottom-nav-fab { 
+            background: linear-gradient(135deg, var(--brand-color), var(--brand-dark));
+            color: white; 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin-top: -25px; 
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4); 
+            border: 4px solid var(--bg-body); 
+            animation: fabPulse 3s infinite;
+        }
+
+        /* Botón flotante scroll to top para móviles */
+        .scroll-to-top {
+            position: fixed;
+            bottom: calc(var(--bottom-nav-height) + 20px);
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--brand-color), var(--brand-dark));
+            color: white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 147, 175, 0.4);
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .scroll-to-top:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 147, 175, 0.6);
+        }
+
+        .scroll-to-top.show {
+            display: flex;
+        }
+
+        /* MAIN WRAPPER */
+        .main-wrapper { 
+            margin-left: var(--sidebar-width); 
+            padding: 2rem; 
+            min-height: 100vh; 
+            width: calc(100vw - var(--sidebar-width)); 
+            box-sizing: border-box; 
+        }
+
+        @media (max-width: 991px) {
+            /* Sidebar tipo "offcanvas" en móvil */
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.sidebar-open {
+                transform: translateX(0);
+            }
+            .main-wrapper {
+                margin-left: 0;
+                width: 100vw;
+                padding: 1.2rem;
+                padding-top: calc(var(--header-height-mobile) + 1.2rem);
+            }
+            .mobile-header { display: flex; }
+            .bottom-nav { display: none; }
+        }
+
+        @media (min-width: 992px) {
+            .scroll-to-top {
+                display: none !important;
+            }
+        }
+
+        /* UTILIDADES */
+        .loader {
+            width: 50px;
+            aspect-ratio: 1;
+            display: grid;
+            border: 4px solid #0000;
+            border-radius: 50%;
+            border-right-color: var(--brand-color);
+            animation: l15 1s infinite linear;
+        }
+
+        .loader::before,
+        .loader::after {
+            content: "";
+            grid-area: 1/1;
+            margin: 2px;
+            border: inherit;
+            border-radius: 50%;
+            animation: l15 2s infinite;
+        }
+
+        .loader::after {
+            margin: 8px;
+            animation-duration: 3s;
+        }
+
+        @keyframes l15 {
+            100% { transform: rotate(1turn); }
+        }
+
+        /* Ajustes de centrado y tamaño responsivo del loader */
+        #globalLoader {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        #globalLoader.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #globalLoader > div {
+            text-align: center;
+        }
+
+        @media (max-width: 576px) {
+            .loader {
+                width: 36px;
+                border-width: 3px;
+            }
+            .loader::before,
+            .loader::after {
+                margin: 1px;
+            }
+            .loader::after {
+                margin: 5px;
+            }
+        }
+
+        .card-custom { 
+            border: none; 
+            border-radius: 12px; 
+            background-color: var(--bg-sidebar); 
+            box-shadow: var(--shadow-card); 
+            transition: transform 0.3s; 
+        }
+        
+        .card-custom:hover { transform: translateY(-3px); }
+        
+        .user-avatar { 
+            width: 36px; 
+            height: 36px; 
+            background-color: rgba(99, 102, 241, 0.2); 
+            color: var(--brand-dark); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+        }
+
+        .alert {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            background-color: var(--bg-sidebar);
+            border-left: 5px solid;
+        }
+        
+        .alert-success { border-color: hsl(160, 84%, 39%); }
+        .alert-danger { border-color: #ef4444; }
+        .alert-warning { border-color: #f59e0b; }
+        .alert-info { border-color: #0093af; }
+
+        /* AJUSTES ESPECÍFICOS PARA MODO OSCURO
+           Corrige textos que usan utilidades de Bootstrap que no dependen de variables */
+        .dark-mode .text-dark {
+            /* Mantener textos que eran negros también en modo oscuro */
+            color: #000000 !important;
+        }
+
+        .dark-mode .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .dark-mode .text-secondary {
+            color: var(--text-muted) !important;
+        }
+
+        /* En modo oscuro, la mayoría de textos forzados a blanco
+           se ven mejor como texto claro "normal" en vez de blanco puro */
+        .dark-mode .text-white {
+            color: var(--text-main) !important;
+        }
+
+        .dark-mode .text-white-50 {
+            color: var(--text-muted) !important;
+        }
+
+        /* Títulos: asegurar buen contraste en modo oscuro aunque el template los pinte de blanco */
+        .dark-mode h1,
+        .dark-mode .h1,
+        .dark-mode h2,
+        .dark-mode .h2,
+        .dark-mode h3,
+        .dark-mode .h3,
+        .dark-mode h4,
+        .dark-mode .h4 {
+            /* Asegurar que los títulos sigan viéndose en negro */
+            color: #000000 !important;
+        }
+
+        /* Elementos que usan bg-light quedan muy claros sobre fondo oscuro */
+        .dark-mode .bg-light {
+            background-color: #111827 !important;
+            color: var(--text-main) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .dark-mode .bg-white,
+        .dark-mode .bg-white.bg-opacity-10,
+        .dark-mode .bg-white.bg-opacity-50 {
+            background-color: #111827 !important;
+            color: var(--text-main) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .dark-mode .border-light-subtle,
+        .dark-mode .border-light,
+        .dark-mode .border-white {
+            border-color: var(--border-color) !important;
+        }
+
+        /* Mejor contraste de enlaces en modo oscuro */
+        .dark-mode a {
+            color: var(--brand-color);
+        }
+
+        .dark-mode a:hover {
+            color: var(--accent-color);
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Loader global de página -->
+    <div id="globalLoader">
+        <div class="text-center">
+            <div class="loader"></div>
+            <div class="mt-3 text-light fw-semibold">Cargando...</div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR (Solo Desktop) -->
+    {% if user.is_authenticated %}
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-shop"></i> ODERIX SISTEM
+        </div>
+        <nav class="sidebar-menu">
+            {% with rol_nombre=user.empleado.rol.nombre|default:'' %}
+            <small class="text-uppercase fw-bold text-muted ps-3 mb-2 d-block" style="font-size: 0.75rem;">Principal</small>
+            <a href="{% url 'dashboard' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="bi bi-house-door"></i> Inicio
+            </a>
+            <a href="{% url 'pedidos:lista' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'lista' or 'pedidos' in request.path %}active{% endif %}">
+                <i class="bi bi-receipt"></i> Órdenes
+            </a>
+            
+            {# Para cocinero ocultamos Menú y Mesas, solo ve Órdenes #}
+            {% if rol_nombre != 'cocinero' %}
+                <small class="text-uppercase fw-bold text-muted ps-3 mb-2 mt-4 d-block" style="font-size: 0.75rem;">Operación</small>
+                <a href="{% url 'menu:index' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'index' and 'menu' in request.path %}active{% endif %}">
+                    <i class="bi bi-book"></i> Menú
+                </a>
+                <a href="{% url 'mesas:index' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'index' and 'mesas' in request.path %}active{% endif %}">
+                    <i class="bi bi-door-open"></i> Mesas
+                </a>
+            {% endif %}
+            
+            {# Solo mostrar la sección de Administración si NO es mesero ni cocinero #}
+            {% if rol_nombre != 'mesero' and rol_nombre != 'cocinero' %}
+                <small class="text-uppercase fw-bold text-muted ps-3 mb-2 mt-4 d-block" style="font-size: 0.75rem;">Administración</small>
+                <a href="{% url 'inventario:index' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'index' and 'inventario' in request.path %}active{% endif %}">
+                    <i class="bi bi-box-seam"></i> Inventario
+                </a>
+                <a href="{% url 'caja:index' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'index' and 'caja' in request.path %}active{% endif %}">
+                    <i class="bi bi-cash-stack"></i> Caja
+                </a>
+                <a href="{% url 'estadisticas:resumen_mensual' %}" class="nav-link-custom {% if 'estadisticas' in request.path %}active{% endif %}">
+                    <i class="bi bi-bar-chart-line"></i> Estadísticas
+                </a>
+                {% if rol_nombre == 'admin' %}
+                <a href="{% url 'ajustes:usuarios_list' %}" class="nav-link-custom {% if 'ajustes' in request.path %}active{% endif %}">
+                    <i class="bi bi-gear"></i> Ajustes
+                </a>
+                <a href="{% url 'contactos:index' %}" class="nav-link-custom {% if request.resolver_match.url_name == 'index' and 'contactos' in request.path %}active{% endif %}">
+                    <i class="bi bi-person-lines-fill"></i> Contactos
+                </a>
+                {% endif %}
+            {% endif %}
+            {% endwith %}
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="user-avatar">
+                        {{ user.username|first|upper }}
+                    </div>
+                    <div style="line-height: 1.2;">
+                        <div class="fw-bold fs-6">{{ user.get_full_name|default:user.username }}</div>
+                        <small class="text-muted text-capitalize" style="font-size: 0.75rem;">
+                            {% if user.empleado %}{{ user.empleado.rol.nombre }}{% else %}Usuario{% endif %}
+                        </small>
+                    </div>
+                </div>
+                <a href="{% url 'logout' %}" class="text-danger" title="Salir"><i class="bi bi-box-arrow-right fs-5"></i></a>
+            </div>
+            <button id="darkModeToggleDesk" class="btn btn-sm btn-outline-secondary w-100 mt-3 border-0" style="background-color: rgba(0,0,0,0.05);">
+                <i class="bi bi-moon me-2"></i> Tema Oscuro
+            </button>
+        </div>
+    </aside>
+    {% else %}
+    <aside class="sidebar d-none d-lg-flex align-items-center justify-content-center" style="color:var(--text-muted);">
+        <div class="text-center w-100 px-4">
+            <i class="bi bi-shop fs-1 mb-3" style="color:var(--brand-color);"></i>
+            <div class="fw-bold mb-2" style="font-size:1.3rem;">Bienvenido</div>
+            <div class="mb-3">Inicia sesión para acceder</div>
+            <a href="{% url 'login' %}" class="btn btn-primary w-100">Entrar</a>
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- HEADER MÓVIL -->
+    <header class="mobile-header">
+        <div class="d-flex align-items-center gap-2">
+            {% if user.is_authenticated %}
+            <button id="sidebarToggle" class="btn btn-link text-primary p-0">
+                <i class="bi bi-list fs-3"></i>
+            </button>
+            {% endif %}
+            <div class="fw-bold d-flex align-items-center text-primary" style="font-size: 1.2rem;">
+                <i class="bi bi-s                                                                                              hop me-2"></i> Restaurante
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <button id="darkModeToggleMob" class="btn btn-link text-muted p-0"><i class="bi bi-moon fs-5"></i></button>
+            {% if user.is_authenticated %}
+                <a href="{% url 'logout' %}" class="text-danger"><i class="bi bi-box-arrow-right fs-4"></i></a>
+            {% else %}
+                <a href="{% url 'login' %}" class="fw-bold text-primary" style="font-size: 0.9rem;">Entrar</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- BOTTOM NAV MÓVIL -->
+    {% if user.is_authenticated %}
+    {% with rol_nombre=user.empleado.rol.nombre|default:'' %}
+    <nav class="bottom-nav">
+        <a href="{% url 'dashboard' %}" class="bottom-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-house-door"></i>
+            <span>Inicio</span>
+        </a>
+        
+        <a href="{% url 'pedidos:lista' %}" class="bottom-nav-item">
+            <div class="bottom-nav-fab">
+                <i class="bi bi-plus-lg" style="font-size: 1.5rem;"></i>
+            </div>
+            <span style="margin-top: 22px;">Órdenes</span>
+        </a>
+
+        {% if rol_nombre != 'cocinero' %}
+        <a href="{% url 'menu:index' %}" class="bottom-nav-item {% if request.resolver_match.url_name == 'index' and 'menu' in request.path %}active{% endif %}">
+            <i class="bi bi-book"></i>
+            <span>Menú</span>
+        </a>
+        
+        <a href="{% url 'mesas:index' %}" class="bottom-nav-item {% if request.resolver_match.url_name == 'index' and 'mesas' in request.path %}active{% endif %}">
+            <i class="bi bi-door-open"></i>
+            <span>Mesas</span>
+        </a>
+        {% endif %}
+    </nav>
+    {% endwith %}
+    {% endif %}
+
+    <!-- Botón flotante Scroll to Top (solo móvil) -->
+    <button class="scroll-to-top" id="scrollToTop" aria-label="Volver arriba">
+        <i class="bi bi-chevron-up" style="font-size: 1.5rem;"></i>
+    </button>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-wrapper noise-bg">
+        <div class="page-inner">
+            <!-- Flash Messages -->
+            {% if messages %}
+                <div class="position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+                    <div id="toastContainer" class="toast-container">
+                        {% for message in messages %}
+                            {% with level=message.level %}
+                                {% if level == 20 %}
+                                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-info-circle me-2"></i> {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% elif level == 25 %}
+                                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-check-circle me-2"></i> {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% elif level == 30 %}
+                                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-exclamation-triangle me-2"></i> {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% elif level == 40 %}
+                                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-x-circle me-2"></i> {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-light py-4 mt-5 border-top d-none d-lg-block">
+        <div class="container-fluid text-center text-muted">
+            <p class="mb-0">© 2025 ODERIX SISTEM - Sistema de Gestión</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        const body = document.body;
+        const btnDesk = document.getElementById('darkModeToggleDesk');
+        const btnMob = document.getElementById('darkModeToggleMob');
+        const globalLoader = document.getElementById('globalLoader');
+        const themeKey = 'themeMode';
+        let loaderTimeoutId = null;
+
+        function showGlobalLoaderImmediate() {
+            if (globalLoader) {
+                globalLoader.classList.add('show');
+            }
+        }
+
+        // Muestra el loader solo si la acción tarda un poco (p.ej. >200ms)
+        function showGlobalLoaderDelayed(delay = 200) {
+            if (!globalLoader) return;
+            if (loaderTimeoutId !== null) return;  // ya programado
+            loaderTimeoutId = setTimeout(() => {
+                showGlobalLoaderImmediate();
+            }, delay);
+        }
+
+        function hideGlobalLoader() {
+            if (loaderTimeoutId !== null) {
+                clearTimeout(loaderTimeoutId);
+                loaderTimeoutId = null;
+            }
+            if (globalLoader) {
+                globalLoader.classList.remove('show');
+            }
+        }
+
+        function setTheme(mode) {
+            body.classList.toggle('dark-mode', mode === 'dark');
+            localStorage.setItem(themeKey, mode);
+            const iconClass = mode === 'dark' ? 'bi-sun' : 'bi-moon';
+            if(btnDesk) btnDesk.innerHTML = `<i class="bi ${iconClass} me-2"></i> ${mode === 'dark' ? 'Tema Claro' : 'Tema Oscuro'}`;
+            if(btnMob) btnMob.innerHTML = `<i class="bi ${iconClass} fs-5"></i>`;
+        }
+
+        const savedTheme = localStorage.getItem(themeKey) || 'light';
+        setTheme(savedTheme);
+
+        const toggleTheme = () => {
+            const current = body.classList.contains('dark-mode') ? 'dark' : 'light';
+            setTheme(current === 'light' ? 'dark' : 'light');
+        };
+
+        if(btnDesk) btnDesk.onclick = toggleTheme;
+        if(btnMob) btnMob.onclick = toggleTheme;
+
+        // Mostrar loader al enviar formularios (navegaciones normales)
+        document.addEventListener('DOMContentLoaded', () => {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', () => {
+                    showGlobalLoaderDelayed();
+                });
+            });
+
+            // Enlaces que quieran mostrar loader pueden usar la clase "show-loader"
+            const loaderLinks = document.querySelectorAll('a.show-loader');
+            loaderLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    // Evita activar en enlaces que abren en otra pestaña
+                    if (link.target !== '_blank') {
+                        showGlobalLoaderDelayed();
+                    }
+                });
+            });
+
+            // Botón scroll to top
+            const scrollToTopBtn = document.getElementById('scrollToTop');
+            if (scrollToTopBtn) {
+                window.addEventListener('scroll', () => {
+                    if (window.pageYOffset > 300) {
+                        scrollToTopBtn.classList.add('show');
+                    } else {
+                        scrollToTopBtn.classList.remove('show');
+                    }
+                });
+
+                scrollToTopBtn.addEventListener('click', () => {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                });
+            }
+        });
+
+        // Registrar Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').catch(err => {
+                    console.error('SW registration failed', err);
+                });
+            });
+        }
+
+        // Sidebar móvil: abrir/cerrar y ocultar al elegir opción
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebar && sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('sidebar-open');
+            });
+
+            const sidebarLinks = sidebar.querySelectorAll('.nav-link-custom');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 991) {
+                        sidebar.classList.remove('sidebar-open');
+                    }
+                });
+            });
+        }
+
+
+        
+    </script>
+
+    {% block extra_js %}{% endblock %}
+
+
+    
+</body>
+
+</html>

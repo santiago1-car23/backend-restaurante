@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Abrir Caja{% endblock %}
+
+{% block content %}
+<style>
+    .card-apertura {
+        border-radius: 20px;
+        border: none;
+        overflow: hidden;
+    }
+    .input-money {
+        font-size: 2rem;
+        font-weight: 700;
+        text-align: center;
+        border-radius: 12px !important;
+        border: 2px solid #e9ecef;
+        padding: 1rem;
+    }
+    .input-money:focus {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.1);
+    }
+    .bg-gradient-success {
+        background: linear-gradient(135deg, #198754, #146c43);
+    }
+    .icon-circle {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card card-apertura shadow-lg">
+                <div class="bg-gradient-success p-4 text-white text-center">
+                    <div class="icon-circle">
+                        <i class="bi bi-unlock-fill fs-3"></i>
+                    </div>
+                    <h3 class="fw-bold mb-1">Nueva Jornada</h3>
+                    <p class="opacity-75 small mb-0">Inicia el turno de trabajo {{ today|date:"d/m/Y" }}</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4 text-center">
+                            <label class="form-label fw-bold text-muted text-uppercase small mb-3">Base de Efectivo (Saldo Inicial)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-0 fs-3 fw-bold text-muted">$</span>
+                                <input type="number" 
+                                       name="saldo_inicial" 
+                                       class="form-control input-money" 
+                                       step="0.01" 
+                                       min="0" 
+                                       placeholder="0.00" 
+                                       autofocus 
+                                       required>
+                            </div>
+                            <div class="form-text mt-2 text-muted">
+                                Ingresa la cantidad de dinero físico disponible en el cajón.
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">Notas de apertura (Opcional)</label>
+                            <textarea name="observaciones" 
+                                      class="form-control" 
+                                      rows="2" 
+                                      placeholder="Ej: Billetes de baja denominación, caja compartida..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg py-3 fw-bold shadow-sm rounded-3">
+                                <i class="bi bi-play-circle-fill me-2"></i> Iniciar Sesión de Caja
+                            </button>
+                            <a href="{% url 'caja:index' %}" class="btn btn-link text-muted mt-2">
+                                Volver al panel anterior
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card-footer bg-light border-0 py-3 text-center">
+                    <small class="text-muted d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-person-circle"></i> Usuario responsable: {{ user.get_full_name|default:user.username }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

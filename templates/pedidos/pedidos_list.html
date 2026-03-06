@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Pedidos - Restaurante{% endblock %}
+
+{% block content %}
+<style>
+    /* Glassmorphism Refinado */
+    .card-custom {
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 20px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(15px) saturate(180%);
+        -webkit-backdrop-filter: blur(15px) saturate(180%);
+    }
+
+    .table-container { border-radius: 15px; overflow: hidden; }
+    
+    .table thead th {
+        background-color: rgba(0, 147, 175, 0.1);
+        color: #0093af;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        border: none;
+        padding: 1.2rem 1rem;
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(0,0,0,0.03);
+        font-size: 0.95rem;
+    }
+
+    .status-pill {
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        border-width: 1px;
+        border-style: solid;
+    }
+
+    .status-pendiente { background: #fff9db; color: #856404; border-color: #ffe066; }
+    .status-listo { background: #ebfbee; color: #2b8a3e; border-color: #b2f2bb; }
+    .status-entregado { background: #e7f5ff; color: #0093af; border-color: #a5d8ff; }
+    .status-pagado { background: #f3f0ff; color: #5f3dc4; border-color: #d0bfff; }
+
+    .btn-action {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        background: white;
+        border: 1px solid #dee2e6;
+    }
+    .btn-action:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .btn-pedidos {
+        background-color: #0093af;
+        border-color: #0093af;
+        color: #ffffff;
+    }
+
+    .btn-pedidos:hover {
+        background-color: #007f96;
+        border-color: #007f96;
+        color: #ffffff;
+    }
+    .container-fluid { position: relative; z-index: 1; }
+
+    /* Scroll interno para tabla de pedidos */
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .table-responsive::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .table-responsive::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #0093af;
+        border-radius: 10px;
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #007f96;
+    }
+
+</style>
+
+<div class="container-fluid py-4 px-md-5">
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item small"><a href="{% url 'dashboard' %}" class="text-decoration-none" style="color: #0093af;">Dashboard</a></li>
+                    <li class="breadcrumb-item active small" aria-current="page">Operaciones</li>
+                </ol>
+            </nav>
+            <h1 class="fw-black text-dark mb-0" style="color: #0093af; letter-spacing: -1px;">
+                Panel de <span style="color: #0093af">Pedidos</span>
+            </h1>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.location.reload()" class="btn btn-white shadow-sm rounded-3">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <a href="{% url 'dashboard' %}" class="btn btn-dark shadow-sm rounded-3 px-4">
+                <i class="bi bi-house-door me-2"></i>Inicio
+            </a>
+        </div>
+    </div>
+
+    {# Tarjeta de mensaje propia del panel de pedidos #}
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+            <div class="card card-custom border-0 shadow-sm rounded-4">
+                <div class="d-flex align-items-center justify-content-between p-3">
+                    <div class="d-flex align-items-center">
+                        {% if message.level_tag == 'success' %}
+                            <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px;">
+                                <i class="bi bi-check-circle-fill"></i>
+                            </div>
+                        {% elif message.level_tag == 'error' %}
+                            <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px;">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                            </div>
+                        {% else %}
+                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px;">
+                                <i class="bi bi-info-circle-fill"></i>
+                            </div>
+                        {% endif %}
+                        <div>
+                            <span class="fw-bold d-block">{{ message }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    
+
+    {% with rol_nombre=user.empleado.rol.nombre|default:'' %}
+    <div class="row g-4">
+
+        {% if rol_nombre != 'cocinero' %}
+        <div class="col-lg-4 col-xl-3">
+            <div class="card card-custom p-4 sticky-top" style="top: 20px;">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3">
+                        <i class="bi bi-plus-lg text-primary fs-4"></i>
+                    </div>
+                    <h5 class="fw-bold mb-0">Nueva Orden</h5>
+                </div>
+
+                <form method="post" action="{% url 'pedidos:lista' %}">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-muted small text-uppercase">Seleccionar Mesa</label>
+                        <select class="form-select form-select-lg rounded-4 border-0 shadow-sm" name="mesa" required style="background-color: #f8f9fa;">
+                            <option value="" selected disabled>¿Qué mesa atiende?</option>
+                            {% for mesa in mesas %}
+                                <option value="{{ mesa.id }}" {% if mesa.estado != 'libre' %}disabled{% endif %}>
+                                    Mesa {{ mesa.numero }} {% if mesa.estado != 'libre' %}({{ mesa.get_estado_display }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-pedidos btn-lg w-100 rounded-4 shadow fw-bold py-3">
+                        ABRIR COMANDA <i class="bi bi-chevron-right ms-2"></i>
+                    </button>
+                </form>
+                
+                <div class="mt-4 pt-3 border-top">
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Mesas libres:</span>
+                        <span class="fw-bold text-success">{{ mesas|length }}</span> </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="{% if rol_nombre == 'cocinero' %}col-12{% else %}col-lg-8 col-xl-9{% endif %}">
+            <div class="card card-custom p-0 overflow-hidden">
+                <div class="p-4 bg-white bg-opacity-50 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-kanban me-2 text-primary"></i>Monitor de Órdenes Activas
+                    </h5>
+                    <span id="ordenes-count" class="badge bg-dark rounded-pill px-3">{{ ordenes|length }} Pedidos</span>
+                </div>
+
+                {% if ordenes %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Folio</th>
+                                <th>Mesa</th>
+                                <th>Mesero</th>
+                                <th>Estado</th>
+                                <th>Total</th>
+                                <th>Tiempo</th>
+                                <th class="text-end pe-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordenes-body">
+                            {% for pedido in ordenes %}
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-black text-primary">#{{ pedido.id }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded-circle p-2 me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                            <i class="bi bi-grid-1x2 small text-muted"></i>
+                                        </div>
+                                        <span class="fw-bold text-dark">Mesa {{ pedido.mesa.numero }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="text-muted small">{{ pedido.mesero.get_full_name|default:pedido.mesero.username }}</span>
+                                </td>
+                                <td>
+                                    {% if pedido.estado == 'pendiente' %}
+                                        <span class="status-pill status-pendiente">Pendiente</span>
+                                    {% elif pedido.estado == 'en_preparacion' %}
+                                        <span class="status-pill status-pendiente">En preparación</span>
+                                    {% elif pedido.estado == 'listo' %}
+                                        <span class="status-pill status-listo">Listo</span>
+                                    {% elif pedido.estado == 'entregado' and pedido.factura %}
+                                        <span class="status-pill status-pagado">Pagado</span>
+                                    {% elif pedido.estado == 'entregado' %}
+                                        <span class="status-pill status-entregado">Servido</span>
+                                    {% else %}
+                                        <span class="status-pill bg-light border text-muted">{{ pedido.get_estado_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-dark">${{ pedido.total|pesos }}</span>
+                                </td>
+                                <td>
+                                    <span class="text-muted small"><i class="bi bi-clock me-1"></i>{{ pedido.fecha_creacion|time:"H:i" }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a href="{% url 'pedidos:detalle' pedido.id %}" class="btn-action text-info" title="Detalle">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </a>
+                                        
+                                        {% if rol_nombre != 'cocinero' %}
+                                            {% if not pedido.factura %}
+                                                <a href="{% url 'pedidos:editar' pedido.id %}" class="btn-action text-primary" title="Editar">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </a>
+                                            {% else %}
+                                                <button type="button" class="btn-action text-secondary" title="No se puede editar, el pedido ya está pagado" disabled>
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </button>
+                                            {% endif %}
+                                            <form method="post" action="{% url 'pedidos:eliminar' pedido.id %}" class="d-inline" onsubmit="return confirm('¿Eliminar pedido #{{ pedido.id }}?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn-action text-danger border-0">
+                                                    <i class="bi bi-trash3-fill"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted opacity-25"></i>
+                    <p class="text-muted mt-3">No hay órdenes activas en este momento.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    </div>
+
+<script>
+    window.ROL_NOMBRE = "{{ rol_nombre|default:''|lower }}";
+    window.USER_IS_STAFF = {{ user.is_staff|yesno:"true,false" }};
+
+    // Lógica de actualización de pedidos
+    function formatoPesos(valorStr) {
+        const num = Number(valorStr || '0');
+        return num.toLocaleString('es-CO', { minimumFractionDigits: 0 });
+    }
+
+    function claseEstado(estado, tieneFactura) {
+        if (estado === 'pendiente') return 'status-pill status-pendiente';
+        if (estado === 'en_preparacion') return 'status-pill status-pendiente';
+        if (estado === 'listo') return 'status-pill status-listo';
+        if (estado === 'entregado' && tieneFactura) return 'status-pill status-pagado';
+        if (estado === 'entregado') return 'status-pill status-entregado';
+        return 'status-pill bg-light border text-muted';
+    }
+
+    function labelEstado(estado, display, tieneFactura) {
+        if (estado === 'pendiente') return 'Pendiente';
+        if (estado === 'en_preparacion') return 'En preparación';
+        if (estado === 'listo') return 'Listo';
+        if (estado === 'entregado' && tieneFactura) return 'Pagado';
+        if (estado === 'entregado') return display || 'Servido';
+        return display || estado;
+    }
+
+    function renderAcciones(pedido) {
+        const rol = window.ROL_NOMBRE || '';
+        const esCocinero = rol === 'cocinero';
+        const puedeEditar = !pedido.tiene_factura;
+
+        let html = '';
+        const urlDetalle = "{% url 'pedidos:detalle' 0 %}".replace('0', pedido.id);
+        const urlEditar = "{% url 'pedidos:editar' 0 %}".replace('0', pedido.id);
+        const urlEliminar = "{% url 'pedidos:eliminar' 0 %}".replace('0', pedido.id);
+
+        html += `<a href="${urlDetalle}" class="btn-action text-info" title="Detalle"><i class="bi bi-eye-fill"></i></a>`;
+
+        if (!esCocinero) {
+            if (puedeEditar) {
+                html += ` <a href="${urlEditar}" class="btn-action text-primary" title="Editar"><i class="bi bi-pencil-square"></i></a>`;
+            } else {
+                html += ` <button type="button" class="btn-action text-secondary" title="No se puede editar, el pedido ya está pagado" disabled>` +
+                        `<i class="bi bi-pencil-square"></i></button>`;
+            }
+            html += ` <form method="post" action="${urlEliminar}" class="d-inline" onsubmit="return confirm('¿Eliminar pedido #${pedido.id}?');">` +
+                `{% csrf_token %}<button type="submit" class="btn-action text-danger border-0"><i class="bi bi-trash3-fill"></i></button></form>`;
+        }
+        return html;
+    }
+
+    async function actualizarOrdenes() {
+        const tbody = document.getElementById('ordenes-body');
+        if (!tbody) return;
+        try {
+            const resp = await fetch("{% url 'pedidos:lista_json' %}");
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const ordenes = data.ordenes || [];
+            tbody.innerHTML = '';
+
+            ordenes.forEach(p => {
+                const estadoClass = claseEstado(p.estado, p.tiene_factura);
+                const estadoLabel = labelEstado(p.estado, p.estado_display, p.tiene_factura);
+                const totalFmt = formatoPesos(p.total);
+
+                const rowHtml = `
+                <tr>
+                    <td class="ps-4"><span class="fw-black text-primary">#${p.id}</span></td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="bg-light rounded-circle p-2 me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                <i class="bi bi-grid-1x2 small text-muted"></i>
+                            </div>
+                            <span class="fw-bold text-dark">Mesa ${p.mesa_numero}</span>
+                        </div>
+                    </td>
+                    <td><span class="text-muted small">${p.mesero_nombre}</span></td>
+                    <td><span class="${estadoClass}">${estadoLabel}</span></td>
+                    <td><span class="fw-bold text-dark">$${totalFmt}</span></td>
+                    <td><span class="text-muted small"><i class="bi bi-clock me-1"></i>${p.hora}</span></td>
+                    <td class="text-end pe-4"><div class="d-flex justify-content-end gap-1">${renderAcciones(p)}</div></td>
+                </tr>`;
+                tbody.insertAdjacentHTML('beforeend', rowHtml);
+            });
+
+            const badge = document.getElementById('ordenes-count');
+            if (badge) badge.textContent = `${ordenes.length} Pedidos`;
+
+        } catch (e) { console.error('Error actualizando pedidos:', e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Actualizar pedidos cada 7 segundos en lugar de cada 3,
+        // para reducir carga de red y re-render del DOM.
+        setInterval(actualizarOrdenes, 7000);
+    });
+</script>
+{% endblock %}

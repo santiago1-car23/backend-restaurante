@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Estadísticas Mensuales{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Estadísticas Mensuales</h2>
+            <p class="text-muted mb-0">Resumen del mes {{ month }}/{{ year }}</p>
+        </div>
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                <input type="month" name="period" class="form-control" value="{{ period_value }}">
+            </div>
+            <button class="btn btn-primary" type="submit">Cambiar</button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold">Total facturado</div>
+                    <div class="h3 fw-bold text-primary mt-2">${{ total_mes|pesos }}</div>
+                </div>
+            </div>
+        
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold">Número de facturas</div>
+                    <div class="h3 fw-bold mt-2">{{ total_facturas }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold">Resumen anual por cierres de caja ({{ year }})</h5>
+                    <p class="text-muted small mb-3">Resultado neto por mes calculado a partir de los cierres de caja.</p>
+                    <div id="cajaMensualChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    // Gráfico de área spline: resultado neto por mes (cierres de caja)
+    const labelsMeses = {{ labels_meses_json|safe }};
+    const dataMeses = {{ data_meses_json|safe }};
+
+    const cajaMensualOptions = {
+        chart: {
+            type: 'area',
+            height: 320,
+            toolbar: { show: false }
+        },
+        series: [
+            {
+                name: 'Resultado neto',
+                data: dataMeses,
+                color: 'rgba(0, 147, 175, 1)'
+            }
+        ],
+        xaxis: {
+            categories: labelsMeses,
+            title: { text: 'Mes' }
+        },
+        yaxis: {
+            title: { text: 'Total (COP $)' }
+        },
+        dataLabels: {
+            enabled: false
+        },
+        stroke: {
+            curve: 'smooth',
+            width: 3
+        },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 0.3,
+                opacityFrom: 0.5,
+                opacityTo: 0.0,
+                stops: [0, 90, 100]
+            }
+        },
+        tooltip: {
+            y: {
+                formatter: function (val) {
+                    if (val === null || val === undefined) return '';
+                    return val.toLocaleString('es-CO', {
+                        style: 'currency',
+                        currency: 'COP',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    });
+                }
+            }
+        },
+        legend: {
+            position: 'top'
+        }
+    };
+
+    const cajaMensualChart = new ApexCharts(document.querySelector('#cajaMensualChart'), cajaMensualOptions);
+    cajaMensualChart.render();
+</script>
+{% endblock %}

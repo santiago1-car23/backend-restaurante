@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Movimientos de Inventario{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3">
+        <div>
+            <h2 class="fw-bold mb-0"><i class="bi bi-clock-history text-primary"></i> Movimientos de inventario</h2>
+            <small class="text-muted">Entradas, salidas y ajustes</small>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch">
+            <a href="{% url 'inventario:index' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+                <i class="bi bi-arrow-left"></i> Volver a inventario
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'inventario:movimiento_nuevo' %}" class="btn btn-primary btn-sm rounded-pill">
+                <i class="bi bi-plus-lg"></i> Nuevo movimiento
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <select name="ingrediente" class="form-select form-select-sm">
+                <option value="">Todos los ingredientes</option>
+                {% for ing in ingredientes %}
+                <option value="{{ ing.id }}" {% if ingrediente_id|stringformat:'s' == ing.id|stringformat:'s' %}selected{% endif %}>{{ ing.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="tipo" class="form-select form-select-sm">
+                <option value="">Todos los tipos</option>
+                <option value="entrada" {% if tipo == 'entrada' %}selected{% endif %}>Entrada</option>
+                <option value="salida" {% if tipo == 'salida' %}selected{% endif %}>Salida</option>
+                <option value="ajuste" {% if tipo == 'ajuste' %}selected{% endif %}>Ajuste</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary btn-sm w-100" type="submit">Filtrar</button>
+        </div>
+    </form>
+
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Ingrediente</th>
+                            <th>Tipo</th>
+                            <th class="text-end">Cantidad</th>
+                            <th>Motivo</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimientos %}
+                        <tr>
+                            <td>{{ mov.fecha|date:'d/m/Y H:i' }}</td>
+                            <td>{{ mov.ingrediente.nombre }}</td>
+                            <td>
+                                {% if mov.tipo == 'entrada' %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">Entrada</span>
+                                {% elif mov.tipo == 'salida' %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger">Salida</span>
+                                {% else %}
+                                    <span class="badge bg-warning bg-opacity-10 text-dark">Ajuste</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ mov.cantidad }}</td>
+                            <td>{{ mov.motivo }}</td>
+                            <td>{{ mov.usuario.get_full_name|default:mov.usuario.username }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">Sin movimientos registrados</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

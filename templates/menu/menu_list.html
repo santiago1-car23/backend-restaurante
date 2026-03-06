@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load moneda %}
+{% load static %}
+
+{% block title %}Menú - Restaurante{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary: #0093af;
+        --secondary: #0093af;
+        --muted: #6b7280;
+        --soft-shadow: 0 12px 28px rgba(0,0,0,.08);
+    }
+
+    /* Card Menú con transparencia y desenfoque */
+    .menu-card {
+        border: none;
+        border-radius: 18px;
+        box-shadow: var(--soft-shadow);
+        transition: .25s;
+        background: rgba(255, 255, 255, 0.85); /* Fondo semi-transparente */
+        backdrop-filter: blur(6px); /* Efecto cristal */
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .menu-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 18px 38px rgba(0,0,0,0.12);
+        background: rgba(255, 255, 255, 0.95);
+    }
+
+    .menu-header { padding: 1rem 1.2rem .5rem; }
+    .menu-body { padding: 0 1.2rem 1rem; }
+    .menu-footer { padding: 0 1.2rem 1.2rem; }
+
+    .menu-title {
+        font-weight: 700;
+        font-size: 1rem;
+        margin-bottom: .15rem;
+        color: #2d3436;
+    }
+
+    .menu-desc {
+        font-size: .85rem;
+        color: var(--muted);
+    }
+
+    .badge-category {
+        background: #e0e7ff;
+        color: var(--primary);
+        font-size: .7rem;
+        padding: .35em .7em;
+        border-radius: 999px;
+        font-weight: 600;
+    }
+
+    .price {
+        font-weight: 800;
+        font-size: 1.05rem;
+        color: var(--secondary);
+    }
+
+    .btn-cart {
+        background: linear-gradient(135deg,#0093af,#0093af);
+        border: none;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 999px;
+    }
+
+    .btn-cart:hover { opacity: .9; color: white; }
+
+    .filter-btn {
+        border-radius: 999px;
+        padding: .35rem .9rem;
+        font-weight: 600;
+        /* Sin color de fondo para no sobreescribir btn-primary/outline */
+        backdrop-filter: blur(4px);
+    }
+
+    .filter-btn.btn-primary {
+        background-color: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .filter-btn.btn-outline-primary {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .filter-btn.btn-primary:hover,
+    .filter-btn.btn-outline-primary:hover {
+        background-color: #007f96;
+        border-color: #007f96;
+        color: #ffffff;
+    }
+
+    .btn-primary {
+        background-color: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .btn-primary:hover,
+    .btn-primary:focus {
+        background-color: #007f96;
+        border-color: #007f96;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-book text-primary"></i> Menú
+            </h2>
+            <small class="text-muted">Productos disponibles</small>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch">
+            <form method="get" action="{% url 'menu:index' %}" class="d-flex gap-2">
+                {% if categoria_id %}
+                    <input type="hidden" name="categoria" value="{{ categoria_id }}">
+                {% endif %}
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="Buscar producto..." value="{{ query }}">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    Buscar
+                </button>
+            </form>
+
+            {% if request.user.is_staff %}
+            <div class="d-flex gap-2">
+                <a href="{% url 'menu:categoria_lista' %}" class="btn btn-outline-secondary btn-sm rounded-pill shadow-sm">
+                    <i class="bi bi-card-list"></i> Categorías
+                </a>
+                <a href="{% url 'menu:categoria_nueva' %}" class="btn btn-outline-secondary btn-sm rounded-pill shadow-sm">
+                    <i class="bi bi-folder-plus"></i> Nueva categoría
+                </a>
+                <a href="{% url 'menu:nuevo' %}" class="btn btn-success btn-sm rounded-pill shadow-sm">
+                    <i class="bi bi-plus-lg"></i> Nuevo producto
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mb-4 d-flex flex-wrap gap-2">
+        <a href="{% url 'menu:index' %}"
+           class="btn filter-btn {% if not categoria_id %}btn-primary text-white{% else %}btn-outline-primary{% endif %}">
+            Todos
+        </a>
+
+        <a href="{% url 'menu:corriente' %}"
+           class="btn filter-btn btn-outline-primary">
+            Corriente
+        </a>
+
+        <a href="{% url 'menu:desayuno' %}"
+           class="btn filter-btn btn-outline-warning text-dark">
+            Desayuno
+        </a>
+
+          {# Filtro rápido para Snacks si existe la categoría #}
+          {% if snacks_categoria_id %}
+          <a href="?categoria={{ snacks_categoria_id }}"
+              class="btn filter-btn {% if categoria_id|stringformat:'s' == snacks_categoria_id|stringformat:'s' %}btn-primary text-white{% else %}btn-outline-primary{% endif %}">
+                Snacks
+          </a>
+          {% endif %}
+
+           {% for cat in categorias %}
+              {% if cat.nombre|lower != 'corriente' and cat.nombre|lower != 'snacks' %}
+           <a href="?categoria={{ cat.id }}"
+             class="btn filter-btn
+             {% if categoria_id|stringformat:'s' == cat.id|stringformat:'s' %}
+                 btn-primary text-white
+             {% else %}
+                 btn-outline-primary
+             {% endif %}">
+              {{ cat.nombre }}
+           </a>
+           {% endif %}
+           {% endfor %}
+    </div>
+
+    {% if productos %}
+    <div class="row g-4">
+        {% for producto in productos %}
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <div class="menu-card h-100 d-flex flex-column">
+
+                <div class="menu-header">
+                    <span class="badge-category">
+                        {{ producto.categoria.nombre }}
+                    </span>
+                </div>
+
+                <div class="menu-body flex-grow-1">
+                    <div class="menu-title">
+                        {{ producto.nombre }}
+                    </div>
+                    <div class="menu-desc">
+                        {{ producto.descripcion|truncatewords:16 }}
+                    </div>
+                </div>
+
+                <div class="menu-footer">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i>
+                            {{ producto.tiempo_preparacion }} min
+                        </small>
+                        <span class="price">
+                            ${{ producto.precio|pesos }}
+                        </span>
+                    </div>
+
+                    {% if request.user.is_staff %}
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'menu:editar' producto.id %}"
+                           class="btn btn-primary btn-sm flex-fill">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'menu:eliminar' producto.id %}"
+                           class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info mt-4 rounded-4 shadow-sm border-0">
+        <i class="bi bi-info-circle"></i> No hay productos disponibles
+    </div>
+    {% endif %}
+
+{% endblock %}

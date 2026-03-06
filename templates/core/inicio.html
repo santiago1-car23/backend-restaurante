@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load moneda %}
+{% load static %}
+
+{% block title %}Inicio - Restaurante{% endblock %}
+
+{% block content %}
+<style>
+    .card-custom {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+        background: rgba(255, 255, 255, 0.8) !important; /* Un poco de transparencia */
+        backdrop-filter: blur(5px); /* Efecto cristalizado */
+    }
+
+    .card-custom:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .container {
+        position: relative;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-8 text-center">
+            <h1 class="display-6 fw-bold mb-2">
+                <i class="bi bi-shop" style="color:#0093af;"></i>
+                Bienvenido al sistema del restaurante
+            </h1>
+            <p class="text-muted mb-0">
+                Hola {{ user.get_full_name|default:user.username }}, selecciona una opción para empezar a trabajar.
+            </p>
+        </div>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-4">
+            <a href="{% url 'pedidos:lista' %}" class="card card-custom h-100 text-decoration-none">
+                <div class="card-body text-center py-4">
+                    <div class="mb-3">
+                        <span class="badge bg-primary-subtle text-primary rounded-circle p-3">
+                            <i class="bi bi-receipt fs-4"></i>
+                        </span>
+                    </div>
+                    <h5 class="fw-bold mb-1">Órdenes</h5>
+                    <p class="text-muted small mb-0">Crear y gestionar los pedidos de las mesas.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'mesas:index' %}" class="card card-custom h-100 text-decoration-none">
+                <div class="card-body text-center py-4">
+                    <div class="mb-3">
+                        <span class="badge bg-success-subtle text-success rounded-circle p-3">
+                            <i class="bi bi-door-open fs-4"></i>
+                        </span>
+                    </div>
+                    <h5 class="fw-bold mb-1">Mesas</h5>
+                    <p class="text-muted small mb-0">Ver el estado de las mesas y abrir cuentas.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'menu:index' %}" class="card card-custom h-100 text-decoration-none">
+                <div class="card-body text-center py-4">
+                    <div class="mb-3">
+                        <span class="badge bg-warning-subtle text-warning rounded-circle p-3">
+                            <i class="bi bi-book fs-4"></i>
+                        </span>
+                    </div>
+                    <h5 class="fw-bold mb-1">Menú</h5>
+                    <p class="text-muted small mb-0">Configurar los platos, bebidas y menú del día.</p>
+                </div>
+            </a>
+        </div>
+    </div>
+{% endblock %}

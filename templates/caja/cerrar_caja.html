@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Cerrar Caja{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="bg-danger p-4 text-white text-center">
+                    <i class="bi bi-door-closed fs-1"></i>
+                    <h3 class="fw-bold mb-0">Cierre de Sesión</h3>
+                    <p class="opacity-75 small mb-0">Finaliza la jornada y verifica saldos</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <div class="bg-light rounded-3 p-4 mb-4 border border-1">
+                        <h6 class="text-uppercase fw-bold text-muted small mb-3 border-bottom pb-2">Resumen de Movimientos</h6>
+                        
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Apertura ({{ sesion.fecha_apertura|date:"H:i" }})</span>
+                            <span class="fw-bold">${{ sesion.saldo_inicial|pesos }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Ventas en Efectivo</span>
+                            <span class="text-success fw-bold">+ ${{ total_efectivo|pesos }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Ventas Tarjeta/Nequi</span>
+                            <span class="text-info fw-bold">+ ${{ total_tarjeta|add:total_transferencia|pesos }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Entradas adicionales</span>
+                            <span class="text-success fw-bold">+ ${{ sesion.entradas_extra|pesos }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted">Salidas registradas</span>
+                            <span class="text-danger fw-bold">- ${{ sesion.salidas|pesos }}</span>
+                        </div>
+                        
+                    </div>
+
+                    <form method="post" id="formCierre">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">Ajustar Salidas de Caja</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0 text-muted">$</span>
+                                <input type="number" name="salidas" class="form-control border-start-0" step="0.01" min="0" value="{{ sesion.salidas }}" id="input-salidas">
+                            </div>
+                            <div class="form-text mt-1">Gastos o retiros finales antes del cierre.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">Observaciones de cierre</label>
+                            <textarea name="observaciones" class="form-control" rows="2" placeholder="Ej: Faltó dinero de una propina, billete falso, etc."></textarea>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <a href="{% url 'caja:index' %}" class="btn btn-light w-100 py-2 border">Cancelar</a>
+                            </div>
+                            <div class="col-6">
+                                <button type="submit" class="btn btn-danger w-100 py-2 fw-bold shadow-sm">
+                                    Cerrar Caja
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body { background: #fdfdfd; }
+    .card { border-radius: 20px; }
+    .bg-danger { background: linear-gradient(135deg, #d9534f, #c9302c) !important; }
+    .form-control:focus { box-shadow: none; border-color: #d9534f; }
+    .border-top { border-top: 2px dashed #dee2e6 !important; }
+</style>
+
+<script>
+// Sin saldo teórico: solo dejamos el formulario simple
+</script>
+{% endblock %}

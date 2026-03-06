@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% load moneda %}
+
+{% block title %}Cobrar Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 overflow-hidden" style="border-radius: 20px;">
+                <div class="bg-primary p-4 text-white text-center">
+                    <i class="bi bi-cash-coin fs-1"></i>
+                    <h3 class="fw-bold mb-0">Finalizar Pago</h3>
+                    <p class="opacity-75 small mb-0">Pedido #{{ pedido.id }} · Mesa {{ pedido.mesa.numero }}</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="post" id="pagoForm">
+                        {% csrf_token %}
+
+                        <label class="form-label fw-bold mb-3 text-muted">Método de pago</label>
+                        <div class="row g-2 mb-4">
+                            <div class="col-4">
+                                <input type="radio" class="btn-check" name="metodo_pago" id="efectivo" value="efectivo" required checked>
+                                <label class="btn btn-outline-success w-100 py-3 d-flex flex-column align-items-center gap-2" for="efectivo">
+                                    <i class="bi bi-cash-stack fs-3"></i>
+                                    <span class="small">Efectivo</span>
+                                </label>
+                            </div>
+                            <div class="col-4">
+                                <input type="radio" class="btn-check" name="metodo_pago" id="tarjeta" value="tarjeta">
+                                <label class="btn btn-outline-primary w-100 py-3 d-flex flex-column align-items-center gap-2" for="tarjeta">
+                                    <i class="bi bi-credit-card fs-3"></i>
+                                    <span class="small">Tarjeta</span>
+                                </label>
+                            </div>
+                            <div class="col-4">
+                                <input type="radio" class="btn-check" name="metodo_pago" id="transferencia" value="transferencia">
+                                <label class="btn btn-outline-primary w-100 py-3 d-flex flex-column align-items-center gap-2" for="transferencia">
+                                    <i class="bi bi-phone fs-3"></i>
+                                    <span class="small">Nequi/Trf</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-7">
+                                <label class="form-label small fw-bold text-muted">Nombre del Cliente</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person"></i></span>
+                                    <input type="text" name="cliente_nombre" class="form-control border-start-0" placeholder="Consumidor Final">
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold text-muted">NIT / CC</label>
+                                <input type="text" name="cliente_nit" class="form-control" placeholder="Opcional">
+                            </div>
+                        </div>
+
+                        <div id="seccion-cambio" class="bg-light p-3 rounded-3 mb-4 border border-dashed">
+                            <div class="row align-items-center">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold mb-1">Recibido</label>
+                                    <input type="number" id="monto_recibido" class="form-control form-control-lg fw-bold text-success" placeholder="0">
+                                </div>
+                                <div class="col-6 text-end">
+                                    <label class="form-label small fw-bold mb-1 d-block text-muted">Cambio</label>
+                                    <span id="vuelto" class="fs-4 fw-bold text-dark">$ 0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center p-3 rounded-3 bg-primary bg-opacity-10 mb-4">
+                            <span class="h5 mb-0 fw-bold">TOTAL A PAGAR</span>
+                            <span class="h3 mb-0 fw-black text-primary" id="total_pedido" data-valor="{{ pedido.total }}">${{ pedido.total|pesos }}</span>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm">
+                                <i class="bi bi-check-circle-fill me-2"></i> Confirmar y Generar Factura
+                            </button>
+                            <a href="{% url 'pedidos:detalle' pedido.id %}" class="btn btn-link text-muted btn-sm">
+                                Cancelar y volver
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body { background: #f4f7f6; }
+    
+    /* Estilo para los botones de método de pago */
+    .btn-check:checked + .btn-outline-primary {
+        background-color: var(--bs-primary);
+        color: white;
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    }
+
+    .btn-check:checked + .btn-outline-success {
+        background-color: var(--bs-success);
+        color: white;
+        box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+    }
+    
+    .btn-outline-primary,
+    .btn-outline-success {
+        border: 2px solid #eee;
+        color: #666;
+        transition: all 0.2s;
+    }
+
+    .btn-outline-primary:hover {
+        border-color: var(--bs-primary);
+        background: transparent;
+        color: var(--bs-primary);
+    }
+
+    .btn-outline-success:hover {
+        border-color: var(--bs-success);
+        background: transparent;
+        color: var(--bs-success);
+    }
+
+    .fw-black { font-weight: 900; }
+    
+    .border-dashed { border-style: dashed !important; }
+
+    /* Animación simple */
+    .card {
+        animation: fadeInDown 0.5s ease-out;
+    }
+
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputRecibido = document.getElementById('monto_recibido');
+    const displayVuelto = document.getElementById('vuelto');
+    const totalPedido = parseFloat(document.getElementById('total_pedido').getAttribute('data-valor'));
+    const radioEfectivo = document.getElementById('efectivo');
+    const seccionCambio = document.getElementById('seccion-cambio');
+    const radiosPago = document.querySelectorAll('input[name="metodo_pago"]');
+    const formPago = document.getElementById('pagoForm');
+
+    // Función para calcular cambio
+    function calcularCambio() {
+        const recibido = parseFloat(inputRecibido.value) || 0;
+        const cambio = recibido - totalPedido;
+        
+        if (recibido > 0) {
+            displayVuelto.innerText = cambio >= 0 
+                ? '$ ' + cambio.toLocaleString('es-CO') 
+                : '$ 0 (Falta dinero)';
+            displayVuelto.classList.toggle('text-danger', cambio < 0);
+            displayVuelto.classList.toggle('text-success', cambio >= 0);
+        } else {
+            displayVuelto.innerText = '$ 0';
+            displayVuelto.classList.remove('text-success', 'text-danger');
+        }
+    }
+
+    // Mostrar/Ocultar calculadora de cambio según método
+    radiosPago.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'efectivo') {
+                seccionCambio.style.display = 'block';
+            } else {
+                seccionCambio.style.display = 'none';
+            }
+        });
+    });
+
+    inputRecibido.addEventListener('input', calcularCambio);
+
+    // Validar que en efectivo se ingrese un valor recibido
+    if (formPago) {
+        formPago.addEventListener('submit', function (e) {
+            const metodoSeleccionado = document.querySelector('input[name="metodo_pago"]:checked');
+            if (metodoSeleccionado && metodoSeleccionado.value === 'efectivo') {
+                const recibido = parseFloat(inputRecibido.value) || 0;
+                if (recibido <= 0) {
+                    e.preventDefault();
+                    alert('Debe ingresar el valor recibido para poder cobrar.');
+                    inputRecibido.focus();
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
