@@ -630,3 +630,154 @@ def factura_detalle(request, factura_id):
         'detalles': detalles,
     }
     return render(request, 'caja/factura_detalle.html', contexto)
+
+
+# ============================================================================
+# API ENDPOINTS CON SWAGGER
+# ============================================================================
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
+def _sesion_payload(sesion):
+    return {
+        'id': sesion.id,
+        'estado': sesion.estado,
+        'estado_display': sesion.get_estado_display(),
+        'usuario_apertura': sesion.usuario_apertura.username if sesion.usuario_apertura else None,
+        'usuario_cierre': sesion.usuario_cierre.username if sesion.usuario_cierre else None,
+        'fecha_apertura': sesion.fecha_apertura.isoformat(),
+        'fecha_cierre': sesion.fecha_cierre.isoformat() if sesion.fecha_cierre else None,
+        'saldo_inicial': float(sesion.saldo_inicial),
+        'saldo_final': float(sesion.saldo_final) if sesion.saldo_final else None,
+        'total_facturado': float(sesion.total_facturado),
+        'entradas_extra': float(sesion.entradas_extra),
+        'salidas': float(sesion.salidas),
+    }
+
+
+def _factura_payload(factura):
+    return {
+        'id': factura.id,
+        'numero_factura': factura.numero_factura,
+        'fecha': factura.fecha.isoformat(),
+        'pedido_id': factura.pedido.id,
+        'cajero': factura.cajero.username if factura.cajero else None,
+        'metodo_pago': factura.metodo_pago,
+        'metodo_pago_display': factura.get_metodo_pago_display(),
+        'subtotal': float(factura.subtotal),
+        'impuesto': float(factura.impuesto),
+        'descuento': float(factura.descuento),
+        'total': float(factura.total),
+        'cliente_nombre': factura.cliente_nombre,
+        'cliente_nit': factura.cliente_nit,
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def sesiones_caja_json(request):
+    """API: Lista/crea sesiones de caja."""
+    restaurante = _restaurante_de_usuario(request.user)
+
+    if request.method == 'POST':
+        sesion = CajaSesion.objects.create(
+            restaurante=restaurante,
+            usuario_apertura=request.user,
+            estado=request.data.get('estado', 'abierta'),
+            saldo_inicial=request.data.get('saldo_inicial', 0),
+            entradas_extra=request.data.get('entradas_extra', 0),
+            salidas=request.data.get('salidas', 0),
+            observaciones=request.data.get('observaciones', ''),
+        )
+        return Response({'sesion': _sesion_payload(sesion)}, status=201)
+
+    sesiones = CajaSesion.objects.select_related('usuario_apertura', 'usuario_cierre').all()
+    if restaurante and not request.user.is_superuser:
+        sesiones = sesiones.filter(restaurante=restaurante)
+
+    # Filtrar por estado si se proporciona
+    estado = request.GET.get('estado')
+    if estado:
+        sesiones = sesiones.filter(estado=estado)
+
+    sesiones = sesiones[:50]  # Limitar a últimas 50
+
+    return Response({'sesiones': [_sesion_payload(s) for s in sesiones]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def sesion_caja_detail_json(request, sesion_id):
+    sesion = get_object_or_404(CajaSesion, pk=sesion_id)
+
+    if request.method == 'DELETE':
+        sesion.delete()
+        return Response(status=204)
+
+    for field in ['estado', 'saldo_inicial', 'entradas_extra', 'salidas', 'saldo_final', 'observaciones']:
+        if field in request.data:
+            setattr(sesion, field, request.data.get(field))
+    sesion.save()
+    return Response({'sesion': _sesion_payload(sesion)})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def facturas_list_json(request):
+    """API: Lista/crea facturas."""
+    restaurante = _restaurante_de_usuario(request.user)
+
+    if request.method == 'POST':
+        pedido_id = request.data.get('pedido_id')
+        if not pedido_id:
+            return Response({'error': 'pedido_id es obligatorio.'}, status=400)
+        pedido = get_object_or_404(Pedido, pk=pedido_id)
+        sesion = None
+        sesion_id = request.data.get('sesion_id')
+        if sesion_id:
+            sesion = get_object_or_404(CajaSesion, pk=sesion_id)
+        factura = Factura.objects.create(
+            pedido=pedido,
+            sesion=sesion,
+            cajero=request.user,
+            metodo_pago=request.data.get('metodo_pago', 'efectivo'),
+            subtotal=request.data.get('subtotal', pedido.total or 0),
+            impuesto=request.data.get('impuesto', 0),
+            descuento=request.data.get('descuento', 0),
+            total=request.data.get('total', pedido.total or 0),
+            cliente_nombre=request.data.get('cliente_nombre', ''),
+            cliente_nit=request.data.get('cliente_nit', ''),
+        )
+        return Response({'factura': _factura_payload(factura)}, status=201)
+
+    facturas = Factura.objects.select_related('pedido', 'cajero', 'sesion').all()
+    if restaurante and not request.user.is_superuser:
+        facturas = facturas.filter(sesion__restaurante=restaurante)
+
+    # Filtrar por método de pago si se proporciona
+    metodo = request.GET.get('metodo_pago')
+    if metodo:
+        facturas = facturas.filter(metodo_pago=metodo)
+
+    facturas = facturas[:100]  # Limitar a últimas 100
+
+    return Response({'facturas': [_factura_payload(f) for f in facturas]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def factura_detail_json(request, factura_id):
+    factura = get_object_or_404(Factura, pk=factura_id)
+
+    if request.method == 'DELETE':
+        factura.delete()
+        return Response(status=204)
+
+    for field in ['metodo_pago', 'subtotal', 'impuesto', 'descuento', 'total', 'cliente_nombre', 'cliente_nit']:
+        if field in request.data:
+            setattr(factura, field, request.data.get(field))
+    factura.save()
+    return Response({'factura': _factura_payload(factura)})

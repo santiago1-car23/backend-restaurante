@@ -466,3 +466,219 @@ def menu_desayuno(request):
     }
     return render(request, 'menu/menu_desayuno.html', context)
 
+
+# ============================================================================
+# API ENDPOINTS CON SWAGGER
+# ============================================================================
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+ 
+
+def _categoria_payload(cat):
+    return {
+        'id': cat.id,
+        'nombre': cat.nombre,
+        'descripcion': cat.descripcion,
+        'activo': cat.activo,
+        'total_productos': cat.productos.count(),
+    }
+
+
+def _producto_payload(prod):
+    return {
+        'id': prod.id,
+        'nombre': prod.nombre,
+        'descripcion': prod.descripcion,
+        'precio': float(prod.precio),
+        'categoria': prod.categoria.nombre if prod.categoria else None,
+        'categoria_id': prod.categoria.id if prod.categoria else None,
+        'disponible': prod.disponible,
+        'tiempo_preparacion': prod.tiempo_preparacion,
+        'fecha_creacion': prod.fecha_creacion.isoformat() if prod.fecha_creacion else None,
+    }
+
+
+def _menu_payload(menu):
+    return {
+        'id': menu.id,
+        'fecha': menu.fecha.isoformat(),
+        'sopa': menu.sopa,
+        'principios': menu.principios,
+        'proteinas': menu.proteinas,
+        'acompanante': menu.acompanante,
+        'precio_sopa': float(menu.precio_sopa),
+        'precio_bandeja': float(menu.precio_bandeja),
+        'precio_completo': float(menu.precio_completo),
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def categorias_list_json(request):
+    """API: Lista/crea categorías del menú."""
+    restaurante = _restaurante_de_usuario(request.user)
+
+    if request.method == 'POST':
+        nombre = (request.data.get('nombre') or '').strip()
+        descripcion = (request.data.get('descripcion') or '').strip()
+        activo = bool(request.data.get('activo', True))
+        if not nombre:
+            return Response({'error': 'El nombre es obligatorio.'}, status=400)
+        categoria = Categoria.objects.create(
+            restaurante=restaurante,
+            nombre=nombre,
+            descripcion=descripcion,
+            activo=activo,
+        )
+        return Response({'categoria': _categoria_payload(categoria)}, status=201)
+
+    categorias = Categoria.objects.filter(activo=True)
+    if restaurante and not request.user.is_superuser:
+        categorias = categorias.filter(restaurante=restaurante)
+
+    return Response({'categorias': [_categoria_payload(cat) for cat in categorias]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def categoria_detail_json(request, categoria_id):
+    restaurante = _restaurante_de_usuario(request.user)
+    categoria = get_object_or_404(Categoria, pk=categoria_id)
+    if restaurante and not request.user.is_superuser and categoria.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'DELETE':
+        categoria.delete()
+        return Response(status=204)
+
+    categoria.nombre = (request.data.get('nombre') or categoria.nombre).strip()
+    categoria.descripcion = request.data.get('descripcion', categoria.descripcion)
+    if 'activo' in request.data:
+        categoria.activo = bool(request.data.get('activo'))
+    categoria.save()
+    return Response({'categoria': _categoria_payload(categoria)})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def productos_list_json(request):
+    """API: Lista/crea productos del menú."""
+    restaurante = _restaurante_de_usuario(request.user)
+
+    if request.method == 'POST':
+        nombre = (request.data.get('nombre') or '').strip()
+        if not nombre:
+            return Response({'error': 'El nombre es obligatorio.'}, status=400)
+        categoria_id = request.data.get('categoria_id')
+        categoria = get_object_or_404(Categoria, pk=categoria_id) if categoria_id else None
+        if categoria and restaurante and not request.user.is_superuser and categoria.restaurante_id != getattr(restaurante, 'id', None):
+            return Response({'error': 'Categoria fuera de tu restaurante.'}, status=403)
+        producto = Producto.objects.create(
+            nombre=nombre,
+            descripcion=request.data.get('descripcion', ''),
+            precio=request.data.get('precio', 0),
+            categoria=categoria,
+            disponible=bool(request.data.get('disponible', True)),
+            tiempo_preparacion=request.data.get('tiempo_preparacion', 15),
+        )
+        return Response({'producto': _producto_payload(producto)}, status=201)
+
+    productos = Producto.objects.select_related('categoria').all()
+
+    # Filtrar por categoría si se proporciona
+    categoria_id = request.GET.get('categoria')
+    if categoria_id:
+        productos = productos.filter(categoria_id=categoria_id)
+
+    # Filtrar por disponibilidad
+    disponible = request.GET.get('disponible')
+    if disponible is not None:
+        disponible_bool = disponible.lower() == 'true'
+        productos = productos.filter(disponible=disponible_bool)
+
+    return Response({'productos': [_producto_payload(prod) for prod in productos]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def producto_detail_json(request, producto_id):
+    restaurante = _restaurante_de_usuario(request.user)
+    producto = get_object_or_404(Producto.objects.select_related('categoria'), pk=producto_id)
+    categoria_actual = producto.categoria
+    if restaurante and categoria_actual and not request.user.is_superuser and categoria_actual.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'DELETE':
+        producto.delete()
+        return Response(status=204)
+
+    if 'nombre' in request.data:
+        producto.nombre = (request.data.get('nombre') or producto.nombre).strip()
+    if 'descripcion' in request.data:
+        producto.descripcion = request.data.get('descripcion') or ''
+    if 'precio' in request.data:
+        producto.precio = request.data.get('precio')
+    if 'disponible' in request.data:
+        producto.disponible = bool(request.data.get('disponible'))
+    if 'tiempo_preparacion' in request.data:
+        producto.tiempo_preparacion = request.data.get('tiempo_preparacion')
+    if 'categoria_id' in request.data:
+        nueva_categoria = get_object_or_404(Categoria, pk=request.data.get('categoria_id'))
+        producto.categoria = nueva_categoria
+    producto.save()
+    return Response({'producto': _producto_payload(producto)})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def menus_diarios_json(request):
+    """API: Lista/crea menús diarios."""
+    restaurante = _restaurante_de_usuario(request.user)
+
+    if request.method == 'POST':
+        fecha = request.data.get('fecha')
+        if not fecha:
+            return Response({'error': 'La fecha es obligatoria (YYYY-MM-DD).'}, status=400)
+        menu = MenuDiario.objects.create(
+            restaurante=restaurante,
+            fecha=fecha,
+            sopa=request.data.get('sopa', ''),
+            principios=request.data.get('principios', ''),
+            proteinas=request.data.get('proteinas', ''),
+            acompanante=request.data.get('acompanante', ''),
+            precio_sopa=request.data.get('precio_sopa', 5000),
+            precio_bandeja=request.data.get('precio_bandeja', 12000),
+            precio_completo=request.data.get('precio_completo', 13000),
+        )
+        return Response({'menu': _menu_payload(menu)}, status=201)
+
+    menus = MenuDiario.objects.all().order_by('-fecha')[:30]  # Últimos 30 días
+    if restaurante and not request.user.is_superuser:
+        menus = menus.filter(restaurante=restaurante)
+
+    return Response({'menus': [_menu_payload(menu) for menu in menus]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def menu_diario_detail_json(request, menu_id):
+    restaurante = _restaurante_de_usuario(request.user)
+    menu = get_object_or_404(MenuDiario, pk=menu_id)
+    if restaurante and not request.user.is_superuser and menu.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'DELETE':
+        menu.delete()
+        return Response(status=204)
+
+    for field in ['sopa', 'principios', 'proteinas', 'acompanante']:
+        if field in request.data:
+            setattr(menu, field, request.data.get(field) or '')
+    for field in ['precio_sopa', 'precio_bandeja', 'precio_completo']:
+        if field in request.data:
+            setattr(menu, field, request.data.get(field))
+    menu.save()
+    return Response({'menu': _menu_payload(menu)})
+

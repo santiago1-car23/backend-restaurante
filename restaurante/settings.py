@@ -21,6 +21,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Django REST Framework y Swagger
+    'rest_framework',
+    'drf_yasg',
     # Aplicaciones personalizadas
     'apps.core',
     'apps.usuarios',
@@ -110,4 +113,43 @@ LOGIN_URL = 'login'
 
 # Opcional: después de iniciar sesión, redirigir al dashboard
 LOGIN_REDIRECT_URL = 'dashboard'
+
+
+# -------------------------
+#   REST FRAMEWORK
+# -------------------------
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+}
+
+# -------------------------
+#   SWAGGER SETTINGS
+# -------------------------
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'basic'
+        },
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
+    },
+    'USE_SESSION_AUTH': True,
+    'LOGIN_URL': 'admin:login',
+    'LOGOUT_URL': 'admin:logout',
+}
 

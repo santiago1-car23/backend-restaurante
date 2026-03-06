@@ -146,6 +146,8 @@
     {% endif %}
     <script>
     // --- Actualización en vivo del estado de las mesas ---
+        const mesasBaseUrl = "{% url 'mesas:index' %}";
+
     function tarjetaMesaHtml(mesa) {
         const esOcupada = mesa.estado === 'ocupada';
         const barClass = esOcupada ? 'estado-ocupada' : 'estado-libre';
@@ -174,7 +176,7 @@
                     ${mesa.estado_display}
                 </span>
 
-                <form method="post" action="{% url 'mesas:cambiar_estado' 0 %}" class="mt-3">`.replace('0', mesa.id) + `
+                <form method="post" action="${mesasBaseUrl}${mesa.id}/estado/" class="mt-3">
                     {% csrf_token %}
                     <input type="hidden" name="accion" value="${accion}">
                     <button class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold">
@@ -183,7 +185,7 @@
                 </form>
 
                 {% if request.user.is_staff %}
-                <form method="post" action="{% url 'mesas:eliminar' 0 %}" class="mt-2" onsubmit="return confirm('¿Eliminar la mesa #${mesa.numero}?');">`.replace('0', mesa.id) + `
+                <form method="post" action="${mesasBaseUrl}${mesa.id}/eliminar/" class="mt-2" onsubmit="return confirm('¿Eliminar la mesa #${mesa.numero}?');">
                     {% csrf_token %}
                     <button class="btn btn-outline-danger btn-sm w-100 rounded-pill">
                         <i class="bi bi-trash"></i> Eliminar mesa

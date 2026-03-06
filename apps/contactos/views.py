@@ -143,13 +143,12 @@ def proveedor_editar(request, proveedor_id):
             proveedor.save()
             messages.success(request, 'Proveedor actualizado correctamente.')
             return redirect('contactos:index')
-
+        
     context = {
         'active': 'contactos',
         'proveedor': proveedor,
     }
     return render(request, 'contactos/proveedor_form.html', context)
-
 
 @login_required(login_url='login')
 @require_POST
@@ -203,3 +202,147 @@ def telefono_editar(request, telefono_id):
         'telefono': telefono,
     }
     return render(request, 'contactos/telefono_form.html', context)
+
+
+# ============================================================================
+# API ENDPOINTS CON SWAGGER
+# ============================================================================
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
+def _proveedor_payload(prov):
+    return {
+        'id': prov.id,
+        'nombre': prov.nombre,
+        'telefono': prov.telefono,
+        'telefono_secundario': prov.telefono_secundario,
+        'email': prov.email,
+        'direccion': prov.direccion,
+        'tipo': prov.tipo,
+        'tipo_display': prov.get_tipo_display(),
+        'notas': prov.notas,
+        'activo': prov.activo,
+    }
+
+
+def _telefono_payload(tel):
+    return {
+        'id': tel.id,
+        'nombre': tel.nombre,
+        'numero': tel.numero,
+        'notas': tel.notas,
+        'activo': tel.activo,
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def proveedores_list_json(request):
+    """API: Lista/crea proveedores."""
+    restaurante = _get_restaurante_from_user(request.user)
+
+    if request.method == 'POST':
+        nombre = (request.data.get('nombre') or '').strip()
+        if not nombre:
+            return Response({'error': 'El nombre es obligatorio.'}, status=400)
+        prov = Proveedor.objects.create(
+            restaurante=restaurante,
+            nombre=nombre,
+            telefono=request.data.get('telefono', ''),
+            telefono_secundario=request.data.get('telefono_secundario', ''),
+            email=request.data.get('email') or None,
+            direccion=request.data.get('direccion') or '',
+            tipo=request.data.get('tipo', 'otros'),
+            notas=request.data.get('notas', ''),
+            activo=bool(request.data.get('activo', True)),
+        )
+        return Response({'proveedor': _proveedor_payload(prov)}, status=201)
+
+    proveedores = Proveedor.objects.all()
+    if restaurante and not request.user.is_superuser:
+        proveedores = proveedores.filter(restaurante=restaurante)
+
+    # Filtrar por tipo si se proporciona
+    tipo = request.GET.get('tipo')
+    if tipo:
+        proveedores = proveedores.filter(tipo=tipo)
+
+    # Filtrar por activo si se proporciona
+    activo = request.GET.get('activo')
+    if activo is not None:
+        activo_bool = activo.lower() == 'true'
+        proveedores = proveedores.filter(activo=activo_bool)
+
+    return Response({'proveedores': [_proveedor_payload(prov) for prov in proveedores]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def proveedor_detail_json(request, proveedor_id):
+    restaurante = _get_restaurante_from_user(request.user)
+    prov = get_object_or_404(Proveedor, pk=proveedor_id)
+    if restaurante and not request.user.is_superuser and prov.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'DELETE':
+        prov.delete()
+        return Response(status=204)
+
+    for field in ['nombre', 'telefono', 'telefono_secundario', 'email', 'direccion', 'tipo', 'notas']:
+        if field in request.data:
+            setattr(prov, field, request.data.get(field))
+    if 'activo' in request.data:
+        prov.activo = bool(request.data.get('activo'))
+    prov.save()
+    return Response({'proveedor': _proveedor_payload(prov)})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def telefonos_list_json(request):
+    """API: Lista/crea teléfonos del negocio."""
+    restaurante = _get_restaurante_from_user(request.user)
+
+    if request.method == 'POST':
+        nombre = (request.data.get('nombre') or '').strip()
+        numero = (request.data.get('numero') or '').strip()
+        if not nombre or not numero:
+            return Response({'error': 'nombre y numero son obligatorios.'}, status=400)
+        tel = TelefonoNegocio.objects.create(
+            restaurante=restaurante,
+            nombre=nombre,
+            numero=numero,
+            notas=request.data.get('notas', ''),
+            activo=bool(request.data.get('activo', True)),
+        )
+        return Response({'telefono': _telefono_payload(tel)}, status=201)
+
+    telefonos = TelefonoNegocio.objects.filter(activo=True)
+    if restaurante and not request.user.is_superuser:
+        telefonos = telefonos.filter(restaurante=restaurante)
+
+    return Response({'telefonos': [_telefono_payload(tel) for tel in telefonos]})
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def telefono_detail_json(request, telefono_id):
+    restaurante = _get_restaurante_from_user(request.user)
+    tel = get_object_or_404(TelefonoNegocio, pk=telefono_id)
+    if restaurante and not request.user.is_superuser and tel.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'DELETE':
+        tel.delete()
+        return Response(status=204)
+
+    for field in ['nombre', 'numero', 'notas']:
+        if field in request.data:
+            setattr(tel, field, request.data.get(field))
+    if 'activo' in request.data:
+        tel.activo = bool(request.data.get('activo'))
+    tel.save()
+    return Response({'telefono': _telefono_payload(tel)})

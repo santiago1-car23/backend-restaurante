@@ -7,6 +7,11 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from apps.mesas.models import Mesa
 from apps.menu.models import Producto, Categoria, MenuDiario
@@ -82,8 +87,57 @@ def lista_pedidos(request):
     return render(request, 'pedidos/pedidos_list.html', contexto)
 
 
-@login_required(login_url='login')
+@swagger_auto_schema(
+    method='get',
+    operation_description='Obtiene lista de pedidos/órdenes activas del restaurante en formato JSON',
+    responses={
+        200: openapi.Response('Lista de órdenes', examples={
+            'application/json': {
+                'ordenes': [
+                    {
+                        'id': 1,
+                        'mesa_numero': 5,
+                        'mesero_nombre': 'Juan Pérez',
+                        'estado': 'pendiente',
+                        'estado_display': 'Pendiente',
+                        'total': 35000.0,
+                        'hora': '14:30',
+                        'tiene_factura': False
+                    }
+                ]
+            }
+        })
+    },
+    tags=['Pedidos API']
+)
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
 def lista_pedidos_json(request):
+    if request.method == 'POST':
+        _, _, restaurante = _get_empleado_rol_restaurante(request.user)
+        mesa_id = request.data.get('mesa_id')
+        if not mesa_id:
+            return Response({'error': 'mesa_id es obligatorio.'}, status=400)
+        mesa = get_object_or_404(Mesa, pk=mesa_id)
+        pedido = Pedido.objects.create(
+            restaurante=restaurante,
+            mesa=mesa,
+            mesero=request.user,
+            estado=request.data.get('estado', 'pendiente'),
+            observaciones=request.data.get('observaciones', ''),
+        )
+        return Response({
+            'orden': {
+                'id': pedido.id,
+                'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
+                'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
+                'estado': pedido.estado,
+                'estado_display': pedido.get_estado_display(),
+                'total': float(pedido.total or 0),
+                'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
+            }
+        }, status=201)
+
     _, _, restaurante = _get_empleado_rol_restaurante(request.user)
 
     pedidos_qs = Pedido.objects.select_related('mesa', 'mesero').filter(
@@ -127,7 +181,52 @@ def lista_pedidos_json(request):
             'tiene_factura': tiene_factura,
         })
 
-    return JsonResponse({'ordenes': data})
+    return Response({'ordenes': data})
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def pedido_detail_json(request, orden_id):
+    _, _, restaurante = _get_empleado_rol_restaurante(request.user)
+    pedido = get_object_or_404(Pedido.objects.select_related('mesa', 'mesero'), pk=orden_id)
+    if restaurante and not request.user.is_superuser and pedido.restaurante_id != getattr(restaurante, 'id', None):
+        return Response({'error': 'No autorizado.'}, status=403)
+
+    if request.method == 'GET':
+        return Response({
+            'orden': {
+                'id': pedido.id,
+                'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
+                'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
+                'estado': pedido.estado,
+                'estado_display': pedido.get_estado_display(),
+                'total': float(pedido.total or 0),
+                'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
+            }
+        })
+
+    if request.method == 'DELETE':
+        pedido.delete()
+        return Response(status=204)
+
+    for field in ['estado', 'observaciones', 'archivado']:
+        if field in request.data:
+            setattr(pedido, field, request.data.get(field))
+    if 'mesa_id' in request.data:
+        pedido.mesa = get_object_or_404(Mesa, pk=request.data.get('mesa_id'))
+    pedido.save()
+
+    return Response({
+        'orden': {
+            'id': pedido.id,
+            'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
+            'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
+            'estado': pedido.estado,
+            'estado_display': pedido.get_estado_display(),
+            'total': float(pedido.total or 0),
+            'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
+        }
+    })
 
 
 @login_required(login_url='login')

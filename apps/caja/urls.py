@@ -14,4 +14,10 @@ urlpatterns = [
     path('entrada/', views.registrar_entrada, name='registrar_entrada'),
     path('venta-rapida/', views.venta_rapida, name='venta_rapida'),
     path('historial/', views.historial_caja, name='historial_caja'),
+    
+    # API Endpoints
+    path('api/sesiones/', views.sesiones_caja_json, name='api_sesiones'),
+    path('api/sesiones/<int:sesion_id>/', views.sesion_caja_detail_json, name='api_sesiones_detail'),
+    path('api/facturas/', views.facturas_list_json, name='api_facturas'),
+    path('api/facturas/<int:factura_id>/', views.factura_detail_json, name='api_facturas_detail'),
 ]
