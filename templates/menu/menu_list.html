@@ -132,8 +132,14 @@
                 </button>
             </form>
 
-            {% if request.user.is_staff %}
+            {% if puede_gestionar_menu %}
             <div class="d-flex gap-2">
+                <a href="{% url 'menu:recetas' %}" class="btn btn-outline-secondary btn-sm rounded-pill shadow-sm">
+                    <i class="bi bi-journal-text"></i> Recetas
+                </a>
+                <a href="{% url 'menu:consumos_menu' %}" class="btn btn-outline-secondary btn-sm rounded-pill shadow-sm">
+                    <i class="bi bi-diagram-3"></i> Gramajes menú
+                </a>
                 <a href="{% url 'menu:categoria_lista' %}" class="btn btn-outline-secondary btn-sm rounded-pill shadow-sm">
                     <i class="bi bi-card-list"></i> Categorías
                 </a>
@@ -219,7 +225,7 @@
                         </span>
                     </div>
 
-                    {% if request.user.is_staff %}
+                    {% if puede_gestionar_menu %}
                     <div class="d-flex gap-2">
                         <a href="{% url 'menu:editar' producto.id %}"
                            class="btn btn-primary btn-sm flex-fill">

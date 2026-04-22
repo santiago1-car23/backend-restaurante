@@ -1,46 +1,43 @@
-from datetime import date
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.template.loader import render_to_string
-from django.urls import reverse
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 
 from apps.mesas.models import Mesa
-from apps.menu.models import Producto, Categoria, MenuDiario
+from apps.menu.inventario import (
+    construir_consumos_opciones_menu,
+    construir_consumos_receta_producto,
+    validar_stock_consumos,
+)
+from apps.menu.models import Producto, Categoria
 from apps.inventario.models import Ingrediente
 from apps.caja.models import Factura
 from .models import Pedido, DetallePedido
+from .services import (
+    ESTADOS_PEDIDO_ACTIVOS,
+    caja_abierta,
+    get_empleado_rol_restaurante,
+    liberar_mesa_si_no_hay_pedidos_activos,
+    menu_del_dia_data,
+    notificar_mesero_pedido_listo,
+)
 
-
-def _get_empleado_rol_restaurante(user):
-    """Helper interno para obtener empleado, rol_nombre y restaurante de forma segura."""
-    empleado = getattr(user, 'empleado', None)
-    rol_nombre = ''
-    restaurante = None
-
-    if empleado is not None:
-        rol = getattr(empleado, 'rol', None)
-        if rol is not None:
-            rol_nombre = getattr(rol, 'nombre', '') or ''
-        restaurante = getattr(empleado, 'restaurante', None)
-
-    return empleado, rol_nombre, restaurante
+PRODUCTOS_TECNICOS_MENU = ['Menu corriente', 'Menu desayuno']
 
 
 @login_required(login_url='login')
 def lista_pedidos(request):
-    empleado, rol_nombre, restaurante = _get_empleado_rol_restaurante(request.user)
+    _, rol_nombre, restaurante = get_empleado_rol_restaurante(request.user)
+    caja_abierta_actual = caja_abierta(restaurante)
 
     # Crear nueva orden si se envía POST
     if request.method == 'POST':
+        if not caja_abierta_actual:
+            messages.warning(request, 'La caja está cerrada. Debes abrir la caja para gestionar pedidos.')
+            return redirect('pedidos:lista')
+
         mesa_id = request.POST.get('mesa')
         if mesa_id:
             try:
@@ -65,80 +62,38 @@ def lista_pedidos(request):
 
     # Pedidos activos para el panel: todos los que no estén cancelados y no
     # hayan sido archivados (cerrados en caja).
-    ordenes_qs = Pedido.objects.select_related('mesa', 'mesero').filter(
-        archivado=False,
-    ).exclude(
-        estado='cancelado',
-    ).order_by('-fecha_creacion')
+    ordenes_qs = Pedido.objects.none()
+    if caja_abierta_actual:
+        ordenes_qs = Pedido.objects.select_related('mesa', 'mesero').filter(
+            archivado=False,
+        ).exclude(
+            estado='cancelado',
+        ).order_by('-fecha_creacion')
 
     # Separar por restaurante: cada usuario ve solo pedidos de su restaurante.
     if restaurante:
         ordenes_qs = ordenes_qs.filter(restaurante=restaurante)
 
-    mesas_qs = Mesa.objects.filter(activa=True)
-    if restaurante:
-        mesas_qs = mesas_qs.filter(restaurante=restaurante)
+    mesas_qs = Mesa.objects.none()
+    if caja_abierta_actual:
+        mesas_qs = Mesa.objects.filter(activa=True)
+        if restaurante:
+            mesas_qs = mesas_qs.filter(restaurante=restaurante)
 
     contexto = {
         'ordenes': ordenes_qs,
         'mesas': mesas_qs,
         'rol_nombre': rol_nombre,
+        'caja_abierta': caja_abierta_actual,
     }
     return render(request, 'pedidos/pedidos_list.html', contexto)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description='Obtiene lista de pedidos/órdenes activas del restaurante en formato JSON',
-    responses={
-        200: openapi.Response('Lista de órdenes', examples={
-            'application/json': {
-                'ordenes': [
-                    {
-                        'id': 1,
-                        'mesa_numero': 5,
-                        'mesero_nombre': 'Juan Pérez',
-                        'estado': 'pendiente',
-                        'estado_display': 'Pendiente',
-                        'total': 35000.0,
-                        'hora': '14:30',
-                        'tiene_factura': False
-                    }
-                ]
-            }
-        })
-    },
-    tags=['Pedidos API']
-)
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@login_required(login_url='login')
 def lista_pedidos_json(request):
-    if request.method == 'POST':
-        _, _, restaurante = _get_empleado_rol_restaurante(request.user)
-        mesa_id = request.data.get('mesa_id')
-        if not mesa_id:
-            return Response({'error': 'mesa_id es obligatorio.'}, status=400)
-        mesa = get_object_or_404(Mesa, pk=mesa_id)
-        pedido = Pedido.objects.create(
-            restaurante=restaurante,
-            mesa=mesa,
-            mesero=request.user,
-            estado=request.data.get('estado', 'pendiente'),
-            observaciones=request.data.get('observaciones', ''),
-        )
-        return Response({
-            'orden': {
-                'id': pedido.id,
-                'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
-                'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
-                'estado': pedido.estado,
-                'estado_display': pedido.get_estado_display(),
-                'total': float(pedido.total or 0),
-                'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
-            }
-        }, status=201)
-
-    _, _, restaurante = _get_empleado_rol_restaurante(request.user)
+    _, _, restaurante = get_empleado_rol_restaurante(request.user)
+    if not caja_abierta(restaurante):
+        return JsonResponse({'ordenes': []})
 
     pedidos_qs = Pedido.objects.select_related('mesa', 'mesero').filter(
         archivado=False,
@@ -181,88 +136,19 @@ def lista_pedidos_json(request):
             'tiene_factura': tiene_factura,
         })
 
-    return Response({'ordenes': data})
-
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def pedido_detail_json(request, orden_id):
-    _, _, restaurante = _get_empleado_rol_restaurante(request.user)
-    pedido = get_object_or_404(Pedido.objects.select_related('mesa', 'mesero'), pk=orden_id)
-    if restaurante and not request.user.is_superuser and pedido.restaurante_id != getattr(restaurante, 'id', None):
-        return Response({'error': 'No autorizado.'}, status=403)
-
-    if request.method == 'GET':
-        return Response({
-            'orden': {
-                'id': pedido.id,
-                'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
-                'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
-                'estado': pedido.estado,
-                'estado_display': pedido.get_estado_display(),
-                'total': float(pedido.total or 0),
-                'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
-            }
-        })
-
-    if request.method == 'DELETE':
-        pedido.delete()
-        return Response(status=204)
-
-    for field in ['estado', 'observaciones', 'archivado']:
-        if field in request.data:
-            setattr(pedido, field, request.data.get(field))
-    if 'mesa_id' in request.data:
-        pedido.mesa = get_object_or_404(Mesa, pk=request.data.get('mesa_id'))
-    pedido.save()
-
-    return Response({
-        'orden': {
-            'id': pedido.id,
-            'mesa_numero': pedido.mesa.numero if pedido.mesa else None,
-            'mesero_nombre': pedido.mesero.username if pedido.mesero else '',
-            'estado': pedido.estado,
-            'estado_display': pedido.get_estado_display(),
-            'total': float(pedido.total or 0),
-            'hora': pedido.fecha_creacion.strftime('%H:%M') if pedido.fecha_creacion else '',
-        }
-    })
+    return JsonResponse({'ordenes': data})
 
 
 @login_required(login_url='login')
 def detalle_pedido(request, orden_id):
     pedido = get_object_or_404(Pedido, pk=orden_id)
-    empleado, rol_nombre, _ = _get_empleado_rol_restaurante(request.user)
+    _, rol_nombre, _ = get_empleado_rol_restaurante(request.user)
     restaurante = getattr(pedido, 'restaurante', None)
+    if not caja_abierta(restaurante):
+        messages.warning(request, 'La caja está cerrada. No puedes gestionar pedidos.')
+        return redirect('pedidos:lista')
 
-    # Cargar menú corriente de hoy (si existe)
-    menu_obj = MenuDiario.objects.filter(fecha=date.today(), restaurante=restaurante).first()
-
-    def _split_lista(valor: str):
-        return [v.strip() for v in valor.split(',') if v.strip()] if valor else []
-
-    menu_corriente_data = None
-    menu_desayuno_data = None
-    if menu_obj:
-        menu_corriente_data = {
-            'sopa': menu_obj.sopa,
-            'sopas': _split_lista(menu_obj.sopa),
-            'principio': _split_lista(menu_obj.principios),
-            'proteina': _split_lista(menu_obj.proteinas),
-            'acompanante': menu_obj.acompanante,
-            'limonada': menu_obj.limonada,
-            'precio_sopa': menu_obj.precio_sopa,
-            'precio_bandeja': menu_obj.precio_bandeja,
-            'precio_completo': menu_obj.precio_completo,
-        }
-
-        if menu_obj.desayuno_principales or menu_obj.desayuno_bebidas or menu_obj.precio_desayuno:
-            menu_desayuno_data = {
-                'principales': _split_lista(menu_obj.desayuno_principales),
-                'bebidas': _split_lista(menu_obj.desayuno_bebidas),
-                'acompanante': menu_obj.desayuno_acompanante,
-                'precio_desayuno': menu_obj.precio_desayuno,
-            }
+    menu_obj, menu_corriente_data, menu_desayuno_data = menu_del_dia_data(restaurante)
 
     categoria_id = request.GET.get('categoria')
     query = (request.GET.get('q') or '').strip()
@@ -295,30 +181,6 @@ def detalle_pedido(request, orden_id):
             cantidad = 1
 
         if cantidad > 0:
-            # Siempre que vengan datos de corriente o desayuno, los agregamos a observaciones
-            extras = []
-            if corr_sopa:
-                extras.append(f"Sopa: {corr_sopa}")
-            if corr_principio:
-                extras.append(f"Principio: {corr_principio}")
-            if corr_proteina:
-                extras.append(f"Proteina: {corr_proteina}")
-            if corr_acompanante:
-                extras.append(f"Acompanante: {corr_acompanante}")
-            if des_principal:
-                extras.append(f"Desayuno principal: {des_principal}")
-            if des_bebida:
-                extras.append(f"Bebida: {des_bebida}")
-            if des_acompanante:
-                extras.append(f"Acompanante desayuno: {des_acompanante}")
-
-            if extras:
-                detalle_txt = "\n".join(extras)
-                if observaciones:
-                    observaciones = f"{observaciones}\n{detalle_txt}"
-                else:
-                    observaciones = detalle_txt
-
             # Formulario GENERAL: usa el producto escogido normalmente
             if tipo_form == 'general' and producto_id:
                 producto = get_object_or_404(Producto, pk=producto_id, disponible=True)
@@ -326,6 +188,22 @@ def detalle_pedido(request, orden_id):
 
             # Formulario CORRIENTE: producto especial "Menu corriente"
             elif tipo_form == 'corriente' and menu_obj:
+                extras = []
+                if corr_sopa:
+                    extras.append(f"Sopa: {corr_sopa}")
+                if corr_principio:
+                    extras.append(f"Principio: {corr_principio}")
+                if corr_proteina:
+                    extras.append(f"Proteina: {corr_proteina}")
+                if corr_acompanante:
+                    extras.append(f"Acompanante: {corr_acompanante}")
+                if extras:
+                    detalle_txt = "\n".join(extras)
+                    if observaciones:
+                        observaciones = f"{observaciones}\n{detalle_txt}"
+                    else:
+                        observaciones = detalle_txt
+
                 categoria_corriente = Categoria.objects.filter(
                     nombre__iexact='corriente',
                     restaurante=restaurante,
@@ -365,6 +243,20 @@ def detalle_pedido(request, orden_id):
 
             # Formulario DESAYUNO
             elif tipo_form == 'desayuno' and menu_obj and menu_desayuno_data:
+                extras = []
+                if des_principal:
+                    extras.append(f"Desayuno principal: {des_principal}")
+                if des_bebida:
+                    extras.append(f"Bebida: {des_bebida}")
+                if des_acompanante:
+                    extras.append(f"Acompanante desayuno: {des_acompanante}")
+                if extras:
+                    detalle_txt = "\n".join(extras)
+                    if observaciones:
+                        observaciones = f"{observaciones}\n{detalle_txt}"
+                    else:
+                        observaciones = detalle_txt
+
                 categoria_desayuno = Categoria.objects.filter(
                     nombre__iexact='desayuno',
                     restaurante=restaurante,
@@ -392,19 +284,47 @@ def detalle_pedido(request, orden_id):
                 producto = None
 
             if producto is not None:
-                # Validar stock del producto al momento de agregarlo al pedido.
-                ingredientes_qs = Ingrediente.objects.filter(nombre=producto.nombre)
-                if restaurante:
-                    ingredientes_qs = ingredientes_qs.filter(restaurante=restaurante)
-
-                ingrediente = ingredientes_qs.first()
-                disponible = ingrediente.cantidad_actual if ingrediente else 0
-
-                if not ingrediente or disponible < cantidad:
-                    messages.error(
-                        request,
-                        f"No hay más stock disponible de {producto.nombre} para agregar al pedido.",
+                consumos_inventario = []
+                if tipo_form == 'general':
+                    consumos_inventario = construir_consumos_receta_producto(producto)
+                elif tipo_form == 'corriente':
+                    consumos_inventario = construir_consumos_opciones_menu(
+                        restaurante,
+                        'corriente',
+                        {
+                            'sopa': corr_sopa,
+                            'principio': corr_principio,
+                            'proteina': corr_proteina,
+                            'acompanante': corr_acompanante,
+                        },
                     )
+                elif tipo_form == 'desayuno':
+                    consumos_inventario = construir_consumos_opciones_menu(
+                        restaurante,
+                        'desayuno',
+                        {
+                            'principal': des_principal,
+                            'bebida': des_bebida,
+                            'acompanante': des_acompanante,
+                        },
+                    )
+
+                errores_stock = validar_stock_consumos(restaurante, consumos_inventario, cantidad)
+
+                if not consumos_inventario and tipo_form == 'general':
+                    ingredientes_qs = Ingrediente.objects.filter(nombre=producto.nombre)
+                    if restaurante:
+                        ingredientes_qs = ingredientes_qs.filter(restaurante=restaurante)
+
+                    ingrediente = ingredientes_qs.first()
+                    disponible = ingrediente.cantidad_actual if ingrediente else 0
+                    if not ingrediente or disponible < cantidad:
+                        errores_stock = [
+                            f"No hay más stock disponible de {producto.nombre} para agregar al pedido."
+                        ]
+
+                if errores_stock:
+                    messages.error(request, " ".join(errores_stock))
                 else:
                     DetallePedido.objects.create(
                         pedido=pedido,
@@ -413,12 +333,15 @@ def detalle_pedido(request, orden_id):
                         precio_unitario=precio_unitario,
                         subtotal=precio_unitario * cantidad,
                         observaciones=observaciones,
+                        consumos_inventario=consumos_inventario,
                     )
 
         return redirect('pedidos:detalle', orden_id=pedido.id)
 
     detalles = pedido.detalles.select_related('producto').all()
-    productos_qs = Producto.objects.filter(disponible=True)
+    productos_qs = Producto.objects.filter(disponible=True).exclude(
+        nombre__in=PRODUCTOS_TECNICOS_MENU
+    )
     if restaurante:
         productos_qs = productos_qs.filter(categoria__restaurante=restaurante)
     productos_qs = productos_qs.order_by('categoria__nombre', 'nombre')
@@ -474,29 +397,34 @@ def detalle_pedido(request, orden_id):
 
 
 @login_required(login_url='login')
-def detalle_pedido_parcial(request, orden_id):
-    """Devuelve solo el tbody de los productos para refresco ligero."""
-    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
-        return JsonResponse({'error': 'Solo AJAX'}, status=400)
-
+def detalle_pedido_productos_partial(request, orden_id):
+    """Devuelve solo la sección HTML de productos del pedido para refresco parcial."""
     pedido = get_object_or_404(Pedido, pk=orden_id)
+    _, rol_nombre, _ = get_empleado_rol_restaurante(request.user)
+    if not caja_abierta(getattr(pedido, 'restaurante', None)):
+        return JsonResponse({'detail': 'La caja está cerrada.'}, status=400)
     detalles = pedido.detalles.select_related('producto').all()
 
-    tbody_html = render_to_string(
-        'pedidos/_detalle_tbody.html',
-        {'detalles': detalles},
-        request=request,
+    contexto = {
+        'pedido': pedido,
+        'detalles': detalles,
+        'rol_nombre': rol_nombre,
+    }
+    tbody_html = render_to_string('pedidos/_detalle_tbody.html', contexto, request=request)
+    return JsonResponse(
+        {
+            'tbody': tbody_html,
+            'total': float(pedido.total or 0),
+        }
     )
-
-    return JsonResponse({
-        'tbody': tbody_html,
-        'total': float(pedido.total or 0),
-    })
 
 
 @login_required(login_url='login')
 def editar_pedido(request, orden_id):
     pedido = get_object_or_404(Pedido, pk=orden_id)
+    if not caja_abierta(getattr(pedido, 'restaurante', None)):
+        messages.warning(request, 'La caja está cerrada. No puedes editar pedidos.')
+        return redirect('pedidos:lista')
     # No permitir editar pedidos que ya tienen factura (pagados)
     if hasattr(pedido, 'factura'):
         messages.error(request, 'No se puede editar este pedido porque ya fue pagado.')
@@ -505,20 +433,7 @@ def editar_pedido(request, orden_id):
     restaurante = getattr(pedido, 'restaurante', None)
 
     # Menú corriente del día para ofrecer opciones en la edición
-    menu_obj = MenuDiario.objects.filter(fecha=date.today(), restaurante=restaurante).first()
-
-    def _split_lista(valor: str):
-        return [v.strip() for v in valor.split(',') if v.strip()] if valor else []
-
-    menu_corriente_data = None
-    if menu_obj:
-        menu_corriente_data = {
-            'sopa': menu_obj.sopa,
-            'sopas': _split_lista(menu_obj.sopa),
-            'principio': _split_lista(menu_obj.principios),
-            'proteina': _split_lista(menu_obj.proteinas),
-            'acompanante': menu_obj.acompanante,
-        }
+    _, menu_corriente_data, _ = menu_del_dia_data(restaurante)
 
     if request.method == 'POST':
         # Actualizar productos del pedido (detalles)
@@ -629,21 +544,15 @@ def editar_pedido(request, orden_id):
 
         # Si el pedido ya no está activo (pagado, entregado o cancelado),
         # y no quedan más pedidos activos en la mesa, liberamos la mesa.
-        mesa = pedido.mesa
-        estados_activos = ['pendiente', 'en_preparacion', 'listo']
-        if pedido.estado not in estados_activos:
-            hay_otro_activo = mesa.pedidos.filter(
-                archivado=False,
-                estado__in=estados_activos,
-            ).exclude(id=pedido.id).exists()
-            if not hay_otro_activo:
-                mesa.estado = 'libre'
-                mesa.save(update_fields=['estado'])
+        if pedido.estado not in ESTADOS_PEDIDO_ACTIVOS:
+            liberar_mesa_si_no_hay_pedidos_activos(pedido.mesa, excluir_pedido_id=pedido.id)
 
         return redirect('pedidos:detalle', orden_id=pedido.id)
 
     detalles = pedido.detalles.select_related('producto').all()
-    productos = Producto.objects.filter(disponible=True).order_by('categoria__nombre', 'nombre')
+    productos = Producto.objects.filter(disponible=True).exclude(
+        nombre__in=PRODUCTOS_TECNICOS_MENU
+    ).order_by('categoria__nombre', 'nombre')
 
     return render(request, 'pedidos/pedidos_edit.html', {
         'pedido': pedido,
@@ -668,14 +577,7 @@ def eliminar_pedido(request, orden_id):
     pedido.delete()
 
     # Si la mesa no tiene más pedidos activos, la marcamos como libre
-    estados_activos = ['pendiente', 'en_preparacion', 'listo']
-    hay_otro_activo = mesa.pedidos.filter(
-        archivado=False,
-        estado__in=estados_activos,
-    ).exists()
-    if not hay_otro_activo:
-        mesa.estado = 'libre'
-        mesa.save(update_fields=['estado'])
+    liberar_mesa_si_no_hay_pedidos_activos(mesa)
 
     # Mostrar tarjeta de confirmación en el panel de pedidos
     messages.success(request, f"Se eliminó el pedido #{folio} correctamente.")
@@ -687,24 +589,23 @@ def eliminar_pedido(request, orden_id):
 def marcar_detalle_servido(request, detalle_id):
     """Marca un producto (detalle) como servido dentro de un pedido."""
     detalle = get_object_or_404(DetallePedido, pk=detalle_id)
-    detalle.servido = True
-    detalle.save()
-
     pedido = detalle.pedido
+    detalles_pedido = pedido.detalles.all()
+    pedido_estaba_listo = detalles_pedido.exists() and all(d.servido for d in detalles_pedido)
+
+    if not detalle.servido:
+        detalle.servido = True
+        detalle.save(update_fields=['servido'])
+
+    detalles_pedido = pedido.detalles.all()
+    pedido_quedo_listo = detalles_pedido.exists() and all(d.servido for d in detalles_pedido)
+
+    if not pedido_estaba_listo and pedido_quedo_listo:
+        notificar_mesero_pedido_listo(pedido)
+
     detalles_pedido = pedido.detalles.all()
     if detalles_pedido.exists() and all(d.servido for d in detalles_pedido):
         pedido.estado = 'entregado'
         pedido.save(update_fields=['estado'])
-
-        # Si ya no quedan pedidos activos en la mesa, liberarla
-        mesa = pedido.mesa
-        if mesa is not None:
-            estados_activos = ['pendiente', 'en_preparacion', 'listo']
-            hay_otro_activo = mesa.pedidos.filter(
-                archivado=False,
-                estado__in=estados_activos,
-            ).exclude(id=pedido.id).exists()
-            if not hay_otro_activo:
-                mesa.estado = 'libre'
-                mesa.save(update_fields=['estado'])
+        liberar_mesa_si_no_hay_pedidos_activos(pedido.mesa, excluir_pedido_id=pedido.id)
     return redirect('pedidos:detalle', orden_id=pedido.id)

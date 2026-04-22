@@ -9,9 +9,8 @@ from django.utils.timezone import localdate
 
 from apps.pedidos.models import Pedido, DetallePedido
 from apps.mesas.models import Mesa
-from apps.inventario.models import Ingrediente, MovimientoInventario
-from apps.core.permisos import requiere_permiso
 from .models import Factura, CajaSesion, MovimientoCaja
+from .services import archivar_pedidos_y_liberar_mesas
 
 
 def _usuario_puede_manejar_caja(user):
@@ -38,7 +37,6 @@ def _restaurante_de_usuario(user):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def caja_view(request):
     """Vista principal de Caja: muestra la sesión activa y sus estadísticas.
 
@@ -89,7 +87,6 @@ def caja_view(request):
         top_productos = []
 
     # Pedidos asociados a mesas físicas que aún no tienen factura (mesas ocupadas para cobrar)
-    # TAMBIÉN incluir ventas rápidas (mesa número 0)
     pedidos_para_cobrar = []
     if sesion_activa:
         estados_activos = ['pendiente', 'en_preparacion', 'listo', 'entregado']
@@ -101,6 +98,7 @@ def caja_view(request):
                 factura__isnull=True,
                 estado__in=estados_activos,
             )
+            .exclude(mesa__numero=0)
         )
 
         if restaurante:
@@ -128,7 +126,6 @@ def caja_view(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def registrar_salida(request):
     """Registra una salida de caja (gasto/retiro) sumándola a la sesión activa."""
     if not _usuario_puede_manejar_caja(request.user):
@@ -180,7 +177,6 @@ def registrar_salida(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def registrar_entrada(request):
     """Registra una entrada extra de dinero a la caja actual.
 
@@ -236,7 +232,6 @@ def registrar_entrada(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def venta_rapida(request):
     """Venta rápida SIN mesa física reutilizando la pantalla de detalle de pedido.
 
@@ -285,7 +280,6 @@ def venta_rapida(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def abrir_caja(request):
     """Inicia una nueva sesión de caja si no hay una abierta."""
     if not _usuario_puede_manejar_caja(request.user):
@@ -325,7 +319,6 @@ def abrir_caja(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def cerrar_caja(request):
     """Cierra la sesión de caja activa y muestra un resumen previo al cierre."""
     if not _usuario_puede_manejar_caja(request.user):
@@ -369,8 +362,7 @@ def cerrar_caja(request):
                 sesion_actual.observaciones = observaciones
 
         sesion_actual.save()
-        # Marcar como archivados los pedidos que fueron facturados en esta sesión
-        Pedido.objects.filter(factura__sesion=sesion_actual).update(archivado=True)
+        archivar_pedidos_y_liberar_mesas(restaurante)
 
         messages.success(request, 'Caja cerrada correctamente.')
         return redirect('caja:resumen_caja', sesion_id=sesion_actual.id)
@@ -387,7 +379,6 @@ def cerrar_caja(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def resumen_caja(request, sesion_id):
     """Muestra el resumen completo de una sesión de caja cerrada."""
     restaurante = _restaurante_de_usuario(request.user)
@@ -444,7 +435,6 @@ def resumen_caja(request, sesion_id):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def historial_caja(request):
     """Listado de todas las sesiones de caja con acceso a su resumen."""
     if not _usuario_puede_manejar_caja(request.user):
@@ -497,7 +487,6 @@ def historial_caja(request):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def cobrar_pedido(request, pedido_id):
     """Genera una factura para un pedido (mesa) usando la caja activa."""
     if not _usuario_puede_manejar_caja(request.user):
@@ -546,32 +535,8 @@ def cobrar_pedido(request, pedido_id):
             cliente_nit=cliente_nit,
         )
 
-        # Descontar del inventario los productos vendidos (solo al cobrar)
-        for detalle in detalles_pedido:
-            # Buscar ingrediente asociado por nombre de producto, dentro del restaurante
-            ingredientes_qs = Ingrediente.objects.filter(nombre=detalle.producto.nombre)
-            if restaurante:
-                ingredientes_qs = ingredientes_qs.filter(restaurante=restaurante)
-
-            ingrediente = ingredientes_qs.first()
-            if not ingrediente:
-                # Si no existe, crearlo rápido para no fallar
-                ingrediente = Ingrediente.objects.create(
-                    restaurante=restaurante,
-                    nombre=detalle.producto.nombre,
-                    unidad='unidad',
-                    cantidad_actual=0,
-                    cantidad_minima=0,
-                    costo_unitario=detalle.precio_unitario,
-                )
-
-            MovimientoInventario.objects.create(
-                ingrediente=ingrediente,
-                tipo='salida',
-                cantidad=detalle.cantidad,
-                motivo=f"Venta pedido #{pedido.id} - {detalle.producto.nombre}",
-                usuario=request.user if request.user.is_authenticated else None,
-            )
+        # El inventario ya se descuenta al crear/editar/eliminar detalles del pedido.
+        # En caja solo facturamos para evitar duplicar salidas de inventario.
 
         # Si el pedido es venta rápida (extra), registrar movimiento informativo
         if getattr(pedido, 'es_extra', False):
@@ -612,7 +577,6 @@ def cobrar_pedido(request, pedido_id):
 
 
 @login_required(login_url='login')
-@requiere_permiso('caja')
 def factura_detalle(request, factura_id):
     """Muestra el detalle de una factura específica (una por pedido)."""
     restaurante = _restaurante_de_usuario(request.user)
@@ -630,154 +594,3 @@ def factura_detalle(request, factura_id):
         'detalles': detalles,
     }
     return render(request, 'caja/factura_detalle.html', contexto)
-
-
-# ============================================================================
-# API ENDPOINTS CON SWAGGER
-# ============================================================================
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-
-def _sesion_payload(sesion):
-    return {
-        'id': sesion.id,
-        'estado': sesion.estado,
-        'estado_display': sesion.get_estado_display(),
-        'usuario_apertura': sesion.usuario_apertura.username if sesion.usuario_apertura else None,
-        'usuario_cierre': sesion.usuario_cierre.username if sesion.usuario_cierre else None,
-        'fecha_apertura': sesion.fecha_apertura.isoformat(),
-        'fecha_cierre': sesion.fecha_cierre.isoformat() if sesion.fecha_cierre else None,
-        'saldo_inicial': float(sesion.saldo_inicial),
-        'saldo_final': float(sesion.saldo_final) if sesion.saldo_final else None,
-        'total_facturado': float(sesion.total_facturado),
-        'entradas_extra': float(sesion.entradas_extra),
-        'salidas': float(sesion.salidas),
-    }
-
-
-def _factura_payload(factura):
-    return {
-        'id': factura.id,
-        'numero_factura': factura.numero_factura,
-        'fecha': factura.fecha.isoformat(),
-        'pedido_id': factura.pedido.id,
-        'cajero': factura.cajero.username if factura.cajero else None,
-        'metodo_pago': factura.metodo_pago,
-        'metodo_pago_display': factura.get_metodo_pago_display(),
-        'subtotal': float(factura.subtotal),
-        'impuesto': float(factura.impuesto),
-        'descuento': float(factura.descuento),
-        'total': float(factura.total),
-        'cliente_nombre': factura.cliente_nombre,
-        'cliente_nit': factura.cliente_nit,
-    }
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def sesiones_caja_json(request):
-    """API: Lista/crea sesiones de caja."""
-    restaurante = _restaurante_de_usuario(request.user)
-
-    if request.method == 'POST':
-        sesion = CajaSesion.objects.create(
-            restaurante=restaurante,
-            usuario_apertura=request.user,
-            estado=request.data.get('estado', 'abierta'),
-            saldo_inicial=request.data.get('saldo_inicial', 0),
-            entradas_extra=request.data.get('entradas_extra', 0),
-            salidas=request.data.get('salidas', 0),
-            observaciones=request.data.get('observaciones', ''),
-        )
-        return Response({'sesion': _sesion_payload(sesion)}, status=201)
-
-    sesiones = CajaSesion.objects.select_related('usuario_apertura', 'usuario_cierre').all()
-    if restaurante and not request.user.is_superuser:
-        sesiones = sesiones.filter(restaurante=restaurante)
-
-    # Filtrar por estado si se proporciona
-    estado = request.GET.get('estado')
-    if estado:
-        sesiones = sesiones.filter(estado=estado)
-
-    sesiones = sesiones[:50]  # Limitar a últimas 50
-
-    return Response({'sesiones': [_sesion_payload(s) for s in sesiones]})
-
-
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def sesion_caja_detail_json(request, sesion_id):
-    sesion = get_object_or_404(CajaSesion, pk=sesion_id)
-
-    if request.method == 'DELETE':
-        sesion.delete()
-        return Response(status=204)
-
-    for field in ['estado', 'saldo_inicial', 'entradas_extra', 'salidas', 'saldo_final', 'observaciones']:
-        if field in request.data:
-            setattr(sesion, field, request.data.get(field))
-    sesion.save()
-    return Response({'sesion': _sesion_payload(sesion)})
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def facturas_list_json(request):
-    """API: Lista/crea facturas."""
-    restaurante = _restaurante_de_usuario(request.user)
-
-    if request.method == 'POST':
-        pedido_id = request.data.get('pedido_id')
-        if not pedido_id:
-            return Response({'error': 'pedido_id es obligatorio.'}, status=400)
-        pedido = get_object_or_404(Pedido, pk=pedido_id)
-        sesion = None
-        sesion_id = request.data.get('sesion_id')
-        if sesion_id:
-            sesion = get_object_or_404(CajaSesion, pk=sesion_id)
-        factura = Factura.objects.create(
-            pedido=pedido,
-            sesion=sesion,
-            cajero=request.user,
-            metodo_pago=request.data.get('metodo_pago', 'efectivo'),
-            subtotal=request.data.get('subtotal', pedido.total or 0),
-            impuesto=request.data.get('impuesto', 0),
-            descuento=request.data.get('descuento', 0),
-            total=request.data.get('total', pedido.total or 0),
-            cliente_nombre=request.data.get('cliente_nombre', ''),
-            cliente_nit=request.data.get('cliente_nit', ''),
-        )
-        return Response({'factura': _factura_payload(factura)}, status=201)
-
-    facturas = Factura.objects.select_related('pedido', 'cajero', 'sesion').all()
-    if restaurante and not request.user.is_superuser:
-        facturas = facturas.filter(sesion__restaurante=restaurante)
-
-    # Filtrar por método de pago si se proporciona
-    metodo = request.GET.get('metodo_pago')
-    if metodo:
-        facturas = facturas.filter(metodo_pago=metodo)
-
-    facturas = facturas[:100]  # Limitar a últimas 100
-
-    return Response({'facturas': [_factura_payload(f) for f in facturas]})
-
-
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def factura_detail_json(request, factura_id):
-    factura = get_object_or_404(Factura, pk=factura_id)
-
-    if request.method == 'DELETE':
-        factura.delete()
-        return Response(status=204)
-
-    for field in ['metodo_pago', 'subtotal', 'impuesto', 'descuento', 'total', 'cliente_nombre', 'cliente_nit']:
-        if field in request.data:
-            setattr(factura, field, request.data.get(field))
-    factura.save()
-    return Response({'factura': _factura_payload(factura)})

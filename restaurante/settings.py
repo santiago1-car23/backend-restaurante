@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Django REST Framework y Swagger
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
     'drf_yasg',
     # Aplicaciones personalizadas
     'apps.core',
@@ -39,13 +41,16 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Permite requests desde Expo Web y clientes en la red local durante desarrollo.
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'restaurante.urls'
 
@@ -123,16 +128,26 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'apps.core.api.pagination.DefaultPageNumberPagination',
     'PAGE_SIZE': 50,
     'DEFAULT_FILTER_BACKENDS': [
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
 }
+
+# CSRF Configuration para Mobile API
+CSRF_TRUSTED_ORIGINS = [
+    'http://192.168.0.108:8082',
+    'http://10.157.27.231:8082',
+    'http://10.157.27.14:8082',
+    'http://10.157.24.1:8082',
+    'http://10.157.27.14:8082',
+]
 
 # -------------------------
 #   SWAGGER SETTINGS

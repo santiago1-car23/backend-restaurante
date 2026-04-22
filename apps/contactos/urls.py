@@ -10,10 +10,4 @@ urlpatterns = [
     path('proveedor/<int:proveedor_id>/eliminar/', views.proveedor_eliminar, name='proveedor_eliminar'),
     path('telefono/<int:telefono_id>/editar/', views.telefono_editar, name='telefono_editar'),
     path('telefono/<int:telefono_id>/eliminar/', views.telefono_eliminar, name='telefono_eliminar'),
-    
-    # API Endpoints
-    path('api/proveedores/', views.proveedores_list_json, name='api_proveedores'),
-    path('api/proveedores/<int:proveedor_id>/', views.proveedor_detail_json, name='api_proveedores_detail'),
-    path('api/telefonos/', views.telefonos_list_json, name='api_telefonos'),
-    path('api/telefonos/<int:telefono_id>/', views.telefono_detail_json, name='api_telefonos_detail'),
 ]
