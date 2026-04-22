@@ -429,7 +429,7 @@ body { background-color: var(--light-bg); }
     document.addEventListener('DOMContentLoaded', function () {
         const tbody = document.getElementById('detalleTbody');
         const totalLabel = document.getElementById('pedidoTotalLabel');
-        const parcialUrl = "{% url 'pedidos:detalle_parcial' pedido.id %}";
+        const parcialUrl = "{% url 'pedidos:detalle_productos_partial' pedido.id %}";
 
         async function refrescarDetalle() {
             try {
@@ -448,8 +448,8 @@ body { background-color: var(--light-bg); }
             }
         }
 
-        // Refresco ligero cada 12s para no saturar el servidor
-        setInterval(refrescarDetalle, 12000);
+        // Refresco parcial más rápido para reflejar cambios hechos desde móvil
+        setInterval(refrescarDetalle, 3000);
     });
     </script>
 
