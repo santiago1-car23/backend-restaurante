@@ -37,6 +37,34 @@ venv/
 ENV/
 env/
 
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+.metro-health-check*
+
+# Expo dentro de my-expo-app
+my-expo-app/node_modules/
+my-expo-app/.expo/
+my-expo-app/android/
+my-expo-app/ios/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+*.tsbuildinfo
+
+# Builds nativos generados
+my-expo-app/android/
+my-expo-app/ios/
+
 # IDE
 .vscode/
 .idea/
