@@ -4,16 +4,42 @@ from types import SimpleNamespace
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Q
+from django.urls import reverse
 
-from apps.core.permisos import requiere_permiso
-from .models import Producto, Categoria, MenuDiario
-from .forms import ProductoForm, CategoriaForm
+from .models import (
+    Categoria,
+    ConsumoOpcionMenu,
+    MenuDiario,
+    Producto,
+    RecetaIngrediente,
+    RecetaProducto,
+)
+from .forms import (
+    CategoriaForm,
+    ConsumoOpcionMenuForm,
+    ProductoForm,
+    RecetaIngredienteForm,
+    RecetaProductoForm,
+)
+
+PRODUCTOS_TECNICOS_MENU = ['Menu corriente', 'Menu desayuno']
 
 
 def _restaurante_de_usuario(user):
     empleado = getattr(user, 'empleado', None)
     return getattr(empleado, 'restaurante', None) if empleado else None
+
+
+def _usuario_puede_gestionar_menu(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    empleado = getattr(user, 'empleado', None)
+    rol = getattr(empleado, 'rol', None) if empleado else None
+    return getattr(rol, 'nombre', '') == 'admin'
 
 
 @login_required(login_url='login')
@@ -34,7 +60,7 @@ def categoria_crear(request):
             categoria = form.save(commit=False)
             categoria.restaurante = restaurante
             categoria.save()
-            return redirect('menu:categoria_lista')
+            return redirect('menu:index')
     else:
         form = CategoriaForm()
 
@@ -120,7 +146,9 @@ def menu_list(request):
 
     restaurante = _restaurante_de_usuario(request.user)
 
-    productos = Producto.objects.filter(disponible=True).select_related('categoria')
+    productos = Producto.objects.filter(disponible=True).exclude(
+        nombre__in=PRODUCTOS_TECNICOS_MENU
+    ).select_related('categoria')
     if restaurante:
         productos = productos.filter(categoria__restaurante=restaurante)
 
@@ -136,21 +164,25 @@ def menu_list(request):
     if restaurante:
         categorias = categorias.filter(restaurante=restaurante)
 
-    # Asegurar categorías fijas SOLO si el restaurante aún no tiene ninguna
+    # Asegurar que existan las categorías fijas para que siempre aparezcan los filtros
     categorias_fijas = ['Snacks', 'Postres', 'Platos', 'Bebidas']
-
-    if not categorias.exists():
-        for nombre_cat in categorias_fijas:
+    
+    for nombre_cat in categorias_fijas:
+        qs = Categoria.objects.filter(nombre__iexact=nombre_cat, activo=True)
+        if restaurante:
+            qs = qs.filter(restaurante=restaurante)
+            
+        if not qs.exists():
             Categoria.objects.create(
                 restaurante=restaurante,
                 nombre=nombre_cat,
                 activo=True,
             )
 
-        # Recargar categorías para incluir las recién creadas
-        categorias = Categoria.objects.filter(activo=True)
-        if restaurante:
-            categorias = categorias.filter(restaurante=restaurante)
+    # Recargar categorías para incluir las recién creadas
+    categorias = Categoria.objects.filter(activo=True)
+    if restaurante:
+        categorias = categorias.filter(restaurante=restaurante)
 
     # Obtener ID de Snacks para el template
     snacks_categoria = categorias.filter(nombre__iexact='snacks').first()
@@ -163,6 +195,7 @@ def menu_list(request):
         'snacks_categoria_id': snacks_categoria_id,
         'categoria_id': categoria_id,
         'query': query,
+        'puede_gestionar_menu': _usuario_puede_gestionar_menu(request.user),
     }
     return render(request, 'menu/menu_list.html', context)
 
@@ -467,218 +500,184 @@ def menu_desayuno(request):
     return render(request, 'menu/menu_desayuno.html', context)
 
 
-# ============================================================================
-# API ENDPOINTS CON SWAGGER
-# ============================================================================
+@login_required(login_url='login')
+def recetas_list(request):
+    if not _usuario_puede_gestionar_menu(request.user):
+        return redirect('menu:index')
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
- 
-
-def _categoria_payload(cat):
-    return {
-        'id': cat.id,
-        'nombre': cat.nombre,
-        'descripcion': cat.descripcion,
-        'activo': cat.activo,
-        'total_productos': cat.productos.count(),
-    }
-
-
-def _producto_payload(prod):
-    return {
-        'id': prod.id,
-        'nombre': prod.nombre,
-        'descripcion': prod.descripcion,
-        'precio': float(prod.precio),
-        'categoria': prod.categoria.nombre if prod.categoria else None,
-        'categoria_id': prod.categoria.id if prod.categoria else None,
-        'disponible': prod.disponible,
-        'tiempo_preparacion': prod.tiempo_preparacion,
-        'fecha_creacion': prod.fecha_creacion.isoformat() if prod.fecha_creacion else None,
-    }
-
-
-def _menu_payload(menu):
-    return {
-        'id': menu.id,
-        'fecha': menu.fecha.isoformat(),
-        'sopa': menu.sopa,
-        'principios': menu.principios,
-        'proteinas': menu.proteinas,
-        'acompanante': menu.acompanante,
-        'precio_sopa': float(menu.precio_sopa),
-        'precio_bandeja': float(menu.precio_bandeja),
-        'precio_completo': float(menu.precio_completo),
-    }
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def categorias_list_json(request):
-    """API: Lista/crea categorías del menú."""
     restaurante = _restaurante_de_usuario(request.user)
+    query = (request.GET.get('q') or '').strip()
 
-    if request.method == 'POST':
-        nombre = (request.data.get('nombre') or '').strip()
-        descripcion = (request.data.get('descripcion') or '').strip()
-        activo = bool(request.data.get('activo', True))
-        if not nombre:
-            return Response({'error': 'El nombre es obligatorio.'}, status=400)
-        categoria = Categoria.objects.create(
-            restaurante=restaurante,
-            nombre=nombre,
-            descripcion=descripcion,
-            activo=activo,
+    productos = Producto.objects.select_related('categoria').filter(disponible=True).exclude(
+        nombre__in=PRODUCTOS_TECNICOS_MENU
+    )
+    if restaurante:
+        productos = productos.filter(categoria__restaurante=restaurante)
+    if query:
+        productos = productos.filter(
+            Q(nombre__icontains=query) | Q(descripcion__icontains=query)
         )
-        return Response({'categoria': _categoria_payload(categoria)}, status=201)
 
-    categorias = Categoria.objects.filter(activo=True)
+    recetas_producto_ids = set(
+        RecetaProducto.objects.filter(producto__in=productos).values_list('producto_id', flat=True)
+    )
+
+    return render(
+        request,
+        'menu/recetas_list.html',
+        {
+            'active': 'menu',
+            'productos': productos.order_by('categoria__nombre', 'nombre'),
+            'query': query,
+            'recetas_producto_ids': recetas_producto_ids,
+        },
+    )
+
+
+@login_required(login_url='login')
+def receta_detalle(request, producto_id):
+    if not _usuario_puede_gestionar_menu(request.user):
+        return redirect('menu:index')
+
+    restaurante = _restaurante_de_usuario(request.user)
+    producto_qs = Producto.objects.select_related('categoria')
     if restaurante and not request.user.is_superuser:
-        categorias = categorias.filter(restaurante=restaurante)
+        producto_qs = producto_qs.filter(categoria__restaurante=restaurante)
+    producto = get_object_or_404(producto_qs, pk=producto_id)
 
-    return Response({'categorias': [_categoria_payload(cat) for cat in categorias]})
-
-
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def categoria_detail_json(request, categoria_id):
-    restaurante = _restaurante_de_usuario(request.user)
-    categoria = get_object_or_404(Categoria, pk=categoria_id)
-    if restaurante and not request.user.is_superuser and categoria.restaurante_id != getattr(restaurante, 'id', None):
-        return Response({'error': 'No autorizado.'}, status=403)
-
-    if request.method == 'DELETE':
-        categoria.delete()
-        return Response(status=204)
-
-    categoria.nombre = (request.data.get('nombre') or categoria.nombre).strip()
-    categoria.descripcion = request.data.get('descripcion', categoria.descripcion)
-    if 'activo' in request.data:
-        categoria.activo = bool(request.data.get('activo'))
-    categoria.save()
-    return Response({'categoria': _categoria_payload(categoria)})
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def productos_list_json(request):
-    """API: Lista/crea productos del menú."""
-    restaurante = _restaurante_de_usuario(request.user)
+    receta, _ = RecetaProducto.objects.get_or_create(producto=producto)
+    editar_item_id = request.GET.get('editar')
+    item_edicion = None
+    if editar_item_id and editar_item_id.isdigit():
+        item_edicion = receta.ingredientes.filter(pk=int(editar_item_id)).first()
 
     if request.method == 'POST':
-        nombre = (request.data.get('nombre') or '').strip()
-        if not nombre:
-            return Response({'error': 'El nombre es obligatorio.'}, status=400)
-        categoria_id = request.data.get('categoria_id')
-        categoria = get_object_or_404(Categoria, pk=categoria_id) if categoria_id else None
-        if categoria and restaurante and not request.user.is_superuser and categoria.restaurante_id != getattr(restaurante, 'id', None):
-            return Response({'error': 'Categoria fuera de tu restaurante.'}, status=403)
-        producto = Producto.objects.create(
-            nombre=nombre,
-            descripcion=request.data.get('descripcion', ''),
-            precio=request.data.get('precio', 0),
-            categoria=categoria,
-            disponible=bool(request.data.get('disponible', True)),
-            tiempo_preparacion=request.data.get('tiempo_preparacion', 15),
-        )
-        return Response({'producto': _producto_payload(producto)}, status=201)
+        accion = request.POST.get('accion')
 
-    productos = Producto.objects.select_related('categoria').all()
+        if accion == 'guardar_receta':
+            receta_form = RecetaProductoForm(request.POST, instance=receta)
+            ingrediente_form = RecetaIngredienteForm(restaurante=restaurante, receta=receta)
+            if receta_form.is_valid():
+                receta_form.instance.producto = producto
+                receta_form.save()
+                messages.success(request, 'Receta actualizada correctamente.')
+                return redirect('menu:receta_detalle', producto_id=producto.id)
+        else:
+            receta_form = RecetaProductoForm(instance=receta)
+            instancia_item = item_edicion if accion == 'guardar_ingrediente' and item_edicion else None
+            ingrediente_form = RecetaIngredienteForm(
+                request.POST,
+                instance=instancia_item,
+                restaurante=restaurante,
+                receta=receta,
+            )
+            if ingrediente_form.is_valid():
+                receta_ingrediente = ingrediente_form.save(commit=False)
+                receta_ingrediente.receta = receta
+                receta_ingrediente.save()
+                if instancia_item:
+                    messages.success(request, 'Ingrediente de la receta actualizado.')
+                else:
+                    messages.success(request, 'Ingrediente agregado a la receta.')
+                return redirect('menu:receta_detalle', producto_id=producto.id)
+    else:
+        receta_form = RecetaProductoForm(instance=receta)
+        ingrediente_form = RecetaIngredienteForm(instance=item_edicion, restaurante=restaurante, receta=receta)
 
-    # Filtrar por categoría si se proporciona
-    categoria_id = request.GET.get('categoria')
-    if categoria_id:
-        productos = productos.filter(categoria_id=categoria_id)
+    return render(
+        request,
+        'menu/receta_detalle.html',
+        {
+            'active': 'menu',
+            'producto': producto,
+            'receta': receta,
+            'receta_form': receta_form,
+            'ingrediente_form': ingrediente_form,
+            'item_edicion': item_edicion,
+            'ingredientes_receta': receta.ingredientes.select_related('ingrediente').order_by('ingrediente__nombre'),
+        },
+    )
 
-    # Filtrar por disponibilidad
-    disponible = request.GET.get('disponible')
-    if disponible is not None:
-        disponible_bool = disponible.lower() == 'true'
-        productos = productos.filter(disponible=disponible_bool)
 
-    return Response({'productos': [_producto_payload(prod) for prod in productos]})
+@login_required(login_url='login')
+def receta_ingrediente_eliminar(request, producto_id, item_id):
+    if not _usuario_puede_gestionar_menu(request.user):
+        return redirect('menu:index')
 
-
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def producto_detail_json(request, producto_id):
     restaurante = _restaurante_de_usuario(request.user)
-    producto = get_object_or_404(Producto.objects.select_related('categoria'), pk=producto_id)
-    categoria_actual = producto.categoria
-    if restaurante and categoria_actual and not request.user.is_superuser and categoria_actual.restaurante_id != getattr(restaurante, 'id', None):
-        return Response({'error': 'No autorizado.'}, status=403)
-
-    if request.method == 'DELETE':
-        producto.delete()
-        return Response(status=204)
-
-    if 'nombre' in request.data:
-        producto.nombre = (request.data.get('nombre') or producto.nombre).strip()
-    if 'descripcion' in request.data:
-        producto.descripcion = request.data.get('descripcion') or ''
-    if 'precio' in request.data:
-        producto.precio = request.data.get('precio')
-    if 'disponible' in request.data:
-        producto.disponible = bool(request.data.get('disponible'))
-    if 'tiempo_preparacion' in request.data:
-        producto.tiempo_preparacion = request.data.get('tiempo_preparacion')
-    if 'categoria_id' in request.data:
-        nueva_categoria = get_object_or_404(Categoria, pk=request.data.get('categoria_id'))
-        producto.categoria = nueva_categoria
-    producto.save()
-    return Response({'producto': _producto_payload(producto)})
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def menus_diarios_json(request):
-    """API: Lista/crea menús diarios."""
-    restaurante = _restaurante_de_usuario(request.user)
-
-    if request.method == 'POST':
-        fecha = request.data.get('fecha')
-        if not fecha:
-            return Response({'error': 'La fecha es obligatoria (YYYY-MM-DD).'}, status=400)
-        menu = MenuDiario.objects.create(
-            restaurante=restaurante,
-            fecha=fecha,
-            sopa=request.data.get('sopa', ''),
-            principios=request.data.get('principios', ''),
-            proteinas=request.data.get('proteinas', ''),
-            acompanante=request.data.get('acompanante', ''),
-            precio_sopa=request.data.get('precio_sopa', 5000),
-            precio_bandeja=request.data.get('precio_bandeja', 12000),
-            precio_completo=request.data.get('precio_completo', 13000),
-        )
-        return Response({'menu': _menu_payload(menu)}, status=201)
-
-    menus = MenuDiario.objects.all().order_by('-fecha')[:30]  # Últimos 30 días
+    receta_item_qs = RecetaIngrediente.objects.select_related('receta', 'receta__producto', 'ingrediente')
     if restaurante and not request.user.is_superuser:
-        menus = menus.filter(restaurante=restaurante)
+        receta_item_qs = receta_item_qs.filter(receta__producto__categoria__restaurante=restaurante)
 
-    return Response({'menus': [_menu_payload(menu) for menu in menus]})
+    item = get_object_or_404(receta_item_qs, pk=item_id, receta__producto_id=producto_id)
+    if request.method == 'POST':
+        item.delete()
+        messages.success(request, 'Ingrediente eliminado de la receta.')
+    return redirect('menu:receta_detalle', producto_id=producto_id)
 
 
-@api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def menu_diario_detail_json(request, menu_id):
+@login_required(login_url='login')
+def consumos_menu_list(request):
+    if not _usuario_puede_gestionar_menu(request.user):
+        return redirect('menu:index')
+
     restaurante = _restaurante_de_usuario(request.user)
-    menu = get_object_or_404(MenuDiario, pk=menu_id)
-    if restaurante and not request.user.is_superuser and menu.restaurante_id != getattr(restaurante, 'id', None):
-        return Response({'error': 'No autorizado.'}, status=403)
+    tipo_menu = (request.GET.get('tipo_menu') or '').strip()
+    editar_id = request.GET.get('editar')
 
-    if request.method == 'DELETE':
-        menu.delete()
-        return Response(status=204)
+    consumos = ConsumoOpcionMenu.objects.select_related('ingrediente', 'restaurante')
+    if restaurante:
+        consumos = consumos.filter(restaurante=restaurante)
+    if tipo_menu in ['corriente', 'desayuno']:
+        consumos = consumos.filter(tipo_menu=tipo_menu)
 
-    for field in ['sopa', 'principios', 'proteinas', 'acompanante']:
-        if field in request.data:
-            setattr(menu, field, request.data.get(field) or '')
-    for field in ['precio_sopa', 'precio_bandeja', 'precio_completo']:
-        if field in request.data:
-            setattr(menu, field, request.data.get(field))
-    menu.save()
-    return Response({'menu': _menu_payload(menu)})
+    item_edicion = None
+    if editar_id and editar_id.isdigit():
+        item_edicion = consumos.filter(pk=int(editar_id)).first()
+
+    if request.method == 'POST':
+        instancia = item_edicion if item_edicion else None
+        form = ConsumoOpcionMenuForm(request.POST, instance=instancia, restaurante=restaurante)
+        if form.is_valid():
+            consumo = form.save(commit=False)
+            consumo.restaurante = restaurante
+            consumo.save()
+            if instancia:
+                messages.success(request, 'Consumo por opción actualizado.')
+            else:
+                messages.success(request, 'Consumo por opción creado.')
+            return redirect(f"{request.path}?tipo_menu={consumo.tipo_menu}")
+    else:
+        form = ConsumoOpcionMenuForm(instance=item_edicion, restaurante=restaurante)
+        if tipo_menu in ['corriente', 'desayuno'] and not item_edicion:
+            form.initial['tipo_menu'] = tipo_menu
+
+    return render(
+        request,
+        'menu/consumos_menu.html',
+        {
+            'active': 'menu',
+            'form': form,
+            'item_edicion': item_edicion,
+            'tipo_menu': tipo_menu,
+            'consumos': consumos.order_by('tipo_menu', 'categoria_opcion', 'nombre_opcion', 'ingrediente__nombre'),
+        },
+    )
+
+
+@login_required(login_url='login')
+def consumo_menu_eliminar(request, item_id):
+    if not _usuario_puede_gestionar_menu(request.user):
+        return redirect('menu:index')
+
+    restaurante = _restaurante_de_usuario(request.user)
+    consumo_qs = ConsumoOpcionMenu.objects.all()
+    if restaurante and not request.user.is_superuser:
+        consumo_qs = consumo_qs.filter(restaurante=restaurante)
+    item = get_object_or_404(consumo_qs, pk=item_id)
+    tipo_menu = item.tipo_menu
+    if request.method == 'POST':
+        item.delete()
+        messages.success(request, 'Consumo por opción eliminado.')
+    return redirect(f"{reverse('menu:consumos_menu')}?tipo_menu={tipo_menu}")
 

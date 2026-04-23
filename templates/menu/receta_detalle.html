@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}Receta {{ producto.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <a href="{% url 'menu:recetas' %}" class="text-muted small"><i class="bi bi-arrow-left"></i> Volver a recetas</a>
+            <h2 class="fw-bold mb-1 mt-1">{{ producto.nombre }}</h2>
+            <p class="text-muted mb-0">Configura la receta y el gramaje por unidad vendida.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card card-custom p-4 h-100">
+                <h5 class="fw-bold mb-3">Configuración de receta</h5>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="guardar_receta">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Notas</label>
+                        {{ receta_form.notas }}
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        {{ receta_form.activo }}
+                        <label class="form-check-label" for="{{ receta_form.activo.id_for_label }}">Receta activa</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar receta</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card card-custom p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">{% if item_edicion %}Editar ingrediente{% else %}Agregar ingrediente{% endif %}</h5>
+                    {% if item_edicion %}
+                    <a href="{% url 'menu:receta_detalle' producto.id %}" class="btn btn-sm btn-outline-secondary">Cancelar edición</a>
+                    {% endif %}
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="guardar_ingrediente">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-semibold">Ingrediente</label>
+                            {{ ingrediente_form.ingrediente }}
+                            {% if ingrediente_form.ingrediente.errors %}<div class="text-danger small mt-1">{{ ingrediente_form.ingrediente.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">{{ ingrediente_form.cantidad.label }}</label>
+                            {{ ingrediente_form.cantidad }}
+                            <div class="small text-muted mt-1">{{ ingrediente_form.cantidad.help_text }}</div>
+                            {% if ingrediente_form.cantidad.errors %}<div class="text-danger small mt-1">{{ ingrediente_form.cantidad.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">
+                        {% if item_edicion %}Actualizar ingrediente{% else %}Agregar ingrediente{% endif %}
+                    </button>
+                </form>
+            </div>
+
+            <div class="card card-custom p-4">
+                <h5 class="fw-bold mb-3">Ingredientes de la receta</h5>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Ingrediente</th>
+                                <th>Unidad</th>
+                                <th>Gramaje/Cantidad</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in ingredientes_receta %}
+                            <tr>
+                                <td>{{ item.ingrediente.nombre }}</td>
+                                <td>{{ item.ingrediente.unidad }}</td>
+                                <td>{{ item.cantidad }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'menu:receta_detalle' producto.id %}?editar={{ item.id }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                    <form method="post" action="{% url 'menu:receta_ingrediente_eliminar' producto.id item.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">Todavía no hay ingredientes configurados en esta receta.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

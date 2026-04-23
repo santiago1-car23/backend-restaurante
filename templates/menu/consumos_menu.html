@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Consumos de menú{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-diagram-3 text-primary"></i> Corriente y desayuno por gramaje</h2>
+            <p class="text-muted mb-0">Configura cuánto inventario consume cada opción elegida por el usuario.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'menu:consumos_menu' %}" class="btn {% if not tipo_menu %}btn-primary{% else %}btn-outline-primary{% endif %}">Todos</a>
+            <a href="{% url 'menu:consumos_menu' %}?tipo_menu=corriente" class="btn {% if tipo_menu == 'corriente' %}btn-primary{% else %}btn-outline-primary{% endif %}">Corriente</a>
+            <a href="{% url 'menu:consumos_menu' %}?tipo_menu=desayuno" class="btn {% if tipo_menu == 'desayuno' %}btn-primary{% else %}btn-outline-primary{% endif %}">Desayuno</a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card card-custom p-4">
+                <h5 class="fw-bold mb-3">{% if item_edicion %}Editar consumo{% else %}Nuevo consumo{% endif %}</h5>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tipo de menú</label>
+                        {{ form.tipo_menu }}
+                        {% if form.tipo_menu.errors %}<div class="text-danger small mt-1">{{ form.tipo_menu.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Categoría de opción</label>
+                        {{ form.categoria_opcion }}
+                        {% if form.categoria_opcion.errors %}<div class="text-danger small mt-1">{{ form.categoria_opcion.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre de la opción</label>
+                        {{ form.nombre_opcion }}
+                        <div class="small text-muted mt-1">{{ form.nombre_opcion.help_text }}</div>
+                        {% if form.nombre_opcion.errors %}<div class="text-danger small mt-1">{{ form.nombre_opcion.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Ingrediente</label>
+                        {{ form.ingrediente }}
+                        {% if form.ingrediente.errors %}<div class="text-danger small mt-1">{{ form.ingrediente.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ form.cantidad.label }}</label>
+                        {{ form.cantidad }}
+                        <div class="small text-muted mt-1">{{ form.cantidad.help_text }}</div>
+                        {% if form.cantidad.errors %}<div class="text-danger small mt-1">{{ form.cantidad.errors }}</div>{% endif %}
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        {{ form.activo }}
+                        <label class="form-check-label" for="{{ form.activo.id_for_label }}">Activo</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill">{% if item_edicion %}Actualizar{% else %}Guardar{% endif %}</button>
+                        {% if item_edicion %}
+                        <a href="{% url 'menu:consumos_menu' %}?tipo_menu={{ item_edicion.tipo_menu }}" class="btn btn-outline-secondary">Cancelar</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card card-custom p-4">
+                <h5 class="fw-bold mb-3">Consumos configurados</h5>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Menú</th>
+                                <th>Categoría</th>
+                                <th>Opción</th>
+                                <th>Ingrediente</th>
+                                <th>Cantidad</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in consumos %}
+                            <tr>
+                                <td>{{ item.get_tipo_menu_display }}</td>
+                                <td>{{ item.get_categoria_opcion_display }}</td>
+                                <td>{{ item.nombre_opcion }}</td>
+                                <td>{{ item.ingrediente.nombre }} ({{ item.ingrediente.unidad }})</td>
+                                <td>{{ item.cantidad }}</td>
+                                <td>
+                                    {% if item.activo %}
+                                    <span class="badge bg-success-subtle text-success border">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary border">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{% url 'menu:consumos_menu' %}?tipo_menu={{ item.tipo_menu }}&editar={{ item.id }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                    <form method="post" action="{% url 'menu:consumo_menu_eliminar' item.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No hay consumos configurados todavía.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
