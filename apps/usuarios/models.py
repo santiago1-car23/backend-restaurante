@@ -11,7 +11,6 @@ class Rol(models.Model):
         ('cajero', 'Cajero'),
         ('cocinero', 'Cocinero'),
     )
-
     nombre = models.CharField(max_length=20, choices=ROLES, unique=True)
     descripcion = models.TextField(blank=True)
     
