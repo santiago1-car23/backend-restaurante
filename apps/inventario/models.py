@@ -63,13 +63,4 @@ class MovimientoInventario(models.Model):
     def __str__(self):
         return f"{self.tipo} - {self.ingrediente.nombre} ({self.cantidad})"
     
-    def save(self, *args, **kwargs):
-        """Actualiza el stock del ingrediente"""
-        super().save(*args, **kwargs)
-        if self.tipo == 'entrada':
-            self.ingrediente.cantidad_actual += self.cantidad
-        elif self.tipo == 'salida':
-            self.ingrediente.cantidad_actual -= self.cantidad
-        elif self.tipo == 'ajuste':
-            self.ingrediente.cantidad_actual = self.cantidad
-        self.ingrediente.save()
+    # El stock se actualiza solo desde la lógica de pedidos, no aquí para evitar doble descuento/suma.

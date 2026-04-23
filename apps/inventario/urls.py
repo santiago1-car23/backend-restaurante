@@ -10,10 +10,4 @@ urlpatterns = [
     path('ingredientes/<int:ingrediente_id>/eliminar/', views.ingrediente_eliminar, name='ingrediente_eliminar'),
     path('movimientos/', views.movimientos_list, name='movimientos'),
     path('movimientos/nuevo/', views.movimiento_nuevo, name='movimiento_nuevo'),
-    
-    # API Endpoints
-    path('api/ingredientes/', views.ingredientes_list_json, name='api_ingredientes'),
-    path('api/ingredientes/<int:ingrediente_id>/', views.ingrediente_detail_json, name='api_ingredientes_detail'),
-    path('api/movimientos/', views.movimientos_inventario_json, name='api_movimientos'),
-    path('api/movimientos/<int:movimiento_id>/', views.movimiento_detail_json, name='api_movimientos_detail'),
 ]
